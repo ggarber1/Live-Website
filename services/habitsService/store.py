@@ -88,6 +88,25 @@ def list_habits(from_date: str, to_date: str) -> list:
     ]
 
 
+def rename_habit(habit_id: str, name: str) -> dict:
+    try:
+        dynamodb_client.update_item(
+            TableName=LIVS_TABLE,
+            Key={'PK': {'S': HABIT_PK}, 'SK': {'S': habit_id}},
+            # "name" is a DynamoDB reserved word, so it has to go through an
+            # expression attribute name. SET name = :name is a ValidationException.
+            UpdateExpression='SET #name = :name',
+            ExpressionAttributeNames={'#name': 'name'},
+            ExpressionAttributeValues={':name': {'S': name}},
+            # Without this, renaming an unknown id silently creates a habit.
+            ConditionExpression='attribute_exists(SK)',
+        )
+    except dynamodb_client.exceptions.ConditionalCheckFailedException as e:
+        raise HabitNotFound(habit_id) from e
+
+    return {'id': habit_id, 'name': name}
+
+
 def _completion_dates(habit_id: str, from_date: str, to_date: str) -> list:
     items = _query_all(
         TableName=LIVS_TABLE,

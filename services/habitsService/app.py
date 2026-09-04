@@ -66,6 +66,21 @@ def create_habit():
         return make_response(jsonify({'error': 'Failed to create habit'}), 500)
 
 
+@app.route('/habits/<habit_id>', methods=['PUT'])
+def rename_habit(habit_id):
+    name, error = _habit_name_from_body()
+    if error:
+        return error
+
+    try:
+        return jsonify(store.rename_habit(habit_id, name))
+    except store.HabitNotFound:
+        return _habit_not_found(habit_id)
+    except Exception:
+        app.logger.exception('Error renaming habit')
+        return make_response(jsonify({'error': 'Failed to rename habit'}), 500)
+
+
 @app.errorhandler(404)
 def resource_not_found(e):
     return make_response(jsonify(error='Not found!'), 404)

@@ -103,3 +103,32 @@ def test_query_all_follows_the_continuation_token(client, monkeypatch):
     assert store._query_all(TableName='t') == [{'SK': {'S': 'a'}}, {'SK': {'S': 'b'}}]
     assert 'ExclusiveStartKey' not in calls[0]
     assert calls[1]['ExclusiveStartKey'] == {'SK': {'S': 'a'}}
+
+
+def test_rename_habit_changes_the_name(client):
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+
+    response = client.put(f'/habits/{habit_id}', json={'name': 'floss nightly'})
+
+    assert response.status_code == 200
+    assert response.get_json() == {'id': habit_id, 'name': 'floss nightly'}
+    assert client.get('/habits').get_json()[0]['name'] == 'floss nightly'
+
+
+def test_rename_habit_with_unknown_id_is_404_and_creates_nothing(client):
+    response = client.put('/habits/not-a-real-id', json={'name': 'ghost'})
+
+    assert response.status_code == 404
+    # Body, not just status: Flask's router also 404s an unmatched path, so this
+    # is what proves the response came from our handler rather than the router.
+    assert 'not-a-real-id' in response.get_json()['error']
+    assert client.get('/habits').get_json() == []
+
+
+def test_rename_habit_without_a_name_is_rejected(client):
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+
+    response = client.put(f'/habits/{habit_id}', json={})
+
+    assert response.status_code == 400
+    assert client.get('/habits').get_json()[0]['name'] == 'floss'
