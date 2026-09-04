@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 
 import boto3
 
+import dates
+
 if TYPE_CHECKING:
     from types_boto3_dynamodb import DynamoDBClient
 
@@ -120,3 +122,57 @@ def _completion_dates(habit_id: str, from_date: str, to_date: str) -> list:
     )
     # Query returns sort-key order, so these come back ascending already.
     return [item['SK']['S'] for item in items]
+
+
+def habit_exists(habit_id: str) -> bool:
+    response = dynamodb_client.get_item(
+        TableName=LIVS_TABLE,
+        Key={'PK': {'S': HABIT_PK}, 'SK': {'S': habit_id}},
+        ProjectionExpression='SK',
+        # Strongly consistent on purpose: mark_done is routinely called right
+        # after POST /habits, and an eventually-consistent read can miss the
+        # just-created habit and 404 a habit that exists.
+        ConsistentRead=True,
+    )
+    return 'Item' in response
+
+
+def mark_done(habit_id: str, completion_date: str) -> dict:
+    """Record that `habit_id` was done on `completion_date`.
+
+    The existence check keeps completions from being written under a habit id
+    that does not exist: such rows are unreachable from the list endpoint and
+    would never be cleaned up by delete_habit. This is a check-then-write race,
+    accepted for a single-user tracker rather than reaching for
+    TransactWriteItems.
+    """
+    completion_date = dates.canonical_date(completion_date)
+
+    if not habit_exists(habit_id):
+        raise HabitNotFound(habit_id)
+
+    dynamodb_client.put_item(
+        TableName=LIVS_TABLE,
+        Item={
+            'PK': {'S': _completions_pk(habit_id)},
+            'SK': {'S': completion_date},
+        },
+    )
+    return {'id': habit_id, 'date': completion_date}
+
+
+def unmark_done(habit_id: str, completion_date: str) -> None:
+    completion_date = dates.canonical_date(completion_date)
+
+    if not habit_exists(habit_id):
+        raise HabitNotFound(habit_id)
+
+    # No ConditionExpression on purpose: unmarking a date that was never marked
+    # is a no-op, because the end state the caller asked for already holds.
+    dynamodb_client.delete_item(
+        TableName=LIVS_TABLE,
+        Key={
+            'PK': {'S': _completions_pk(habit_id)},
+            'SK': {'S': completion_date},
+        },
+    )

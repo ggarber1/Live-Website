@@ -81,6 +81,40 @@ def rename_habit(habit_id):
         return make_response(jsonify({'error': 'Failed to rename habit'}), 500)
 
 
+@app.route('/habits/<habit_id>/completions/<completion_date>', methods=['PUT'])
+def mark_done(habit_id, completion_date):
+    try:
+        completion_date = dates.canonical_date(completion_date)
+    except dates.InvalidDate as e:
+        return make_response(jsonify({'error': str(e)}), 400)
+
+    try:
+        return jsonify(store.mark_done(habit_id, completion_date))
+    except store.HabitNotFound:
+        return _habit_not_found(habit_id)
+    except Exception:
+        app.logger.exception('Error marking habit done')
+        return make_response(jsonify({'error': 'Failed to mark habit done'}), 500)
+
+
+@app.route('/habits/<habit_id>/completions/<completion_date>', methods=['DELETE'])
+def unmark_done(habit_id, completion_date):
+    try:
+        completion_date = dates.canonical_date(completion_date)
+    except dates.InvalidDate as e:
+        return make_response(jsonify({'error': str(e)}), 400)
+
+    try:
+        store.unmark_done(habit_id, completion_date)
+    except store.HabitNotFound:
+        return _habit_not_found(habit_id)
+    except Exception:
+        app.logger.exception('Error unmarking habit')
+        return make_response(jsonify({'error': 'Failed to unmark habit'}), 500)
+
+    return jsonify({'message': 'Completion removed successfully'})
+
+
 @app.errorhandler(404)
 def resource_not_found(e):
     return make_response(jsonify(error='Not found!'), 404)
