@@ -132,3 +132,119 @@ def test_rename_habit_without_a_name_is_rejected(client):
 
     assert response.status_code == 400
     assert client.get('/habits').get_json()[0]['name'] == 'floss'
+
+
+def test_delete_habit_removes_it(client):
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+
+    response = client.delete(f'/habits/{habit_id}')
+
+    assert response.status_code == 200
+    assert client.get('/habits').get_json() == []
+
+
+def test_delete_habit_with_unknown_id_is_404(client):
+    response = client.delete('/habits/not-a-real-id')
+
+    assert response.status_code == 404
+    # Body, not just status: Flask's router also 404s, so this proves the
+    # response came from our handler.
+    assert 'not-a-real-id' in response.get_json()['error']
+
+
+def test_delete_habit_leaves_no_completions_behind(client):
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+    for day in ('2026-09-01', '2026-09-02', '2026-09-03'):
+        client.put(f'/habits/{habit_id}/completions/{day}')
+
+    assert client.delete(f'/habits/{habit_id}').status_code == 200
+
+    # GET /habits queries PK='HABIT' and would never surface a row at
+    # PK='HABIT#<id>', so read the completion partition directly.
+    import store
+
+    assert store._completion_dates(habit_id, '2026-01-01', '2026-12-31') == []
+
+
+def test_delete_habit_cascades_past_one_batch_write(client):
+    """BatchWriteItem caps at 25 items, so a cascade must chunk correctly."""
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+    for day in range(1, 29):
+        client.put(f'/habits/{habit_id}/completions/2026-09-{day:02d}')
+
+    assert client.delete(f'/habits/{habit_id}').status_code == 200
+
+    import store
+
+    assert store._completion_dates(habit_id, '2026-01-01', '2026-12-31') == []
+
+
+def test_cascade_never_sends_more_than_25_items_per_batch(client):
+    """moto accepts oversized batches, so only the call args can prove chunking.
+
+    Real BatchWriteItem caps at 25 and would raise ValidationException.
+    """
+    import store
+
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+    for day in range(1, 29):
+        client.put(f'/habits/{habit_id}/completions/2026-09-{day:02d}')
+
+    batch_sizes = []
+    real_batch_write = store.dynamodb_client.batch_write_item
+
+    def recording_batch_write(**kwargs):
+        batch_sizes.append(len(kwargs['RequestItems'][store.LIVS_TABLE]))
+        return real_batch_write(**kwargs)
+
+    store.dynamodb_client.batch_write_item = recording_batch_write
+    try:
+        assert client.delete(f'/habits/{habit_id}').status_code == 200
+    finally:
+        store.dynamodb_client.batch_write_item = real_batch_write
+
+    assert batch_sizes == [25, 3]
+    assert max(batch_sizes) <= store.BATCH_WRITE_LIMIT
+
+
+def test_cascade_gives_up_instead_of_retrying_forever(client):
+    """A backend that never drains UnprocessedItems must not busy-loop."""
+    import store
+
+    habit_id = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+    client.put(f'/habits/{habit_id}/completions/2026-09-03')
+
+    stuck = {
+        'UnprocessedItems': {
+            store.LIVS_TABLE: [
+                {'DeleteRequest': {'Key': {'PK': {'S': 'x'}, 'SK': {'S': 'y'}}}}
+            ]
+        }
+    }
+    calls = []
+    real_batch_write = store.dynamodb_client.batch_write_item
+
+    def never_drains(**kwargs):
+        calls.append(kwargs)
+        return stuck
+
+    store.dynamodb_client.batch_write_item = never_drains
+    try:
+        response = client.delete(f'/habits/{habit_id}')
+    finally:
+        store.dynamodb_client.batch_write_item = real_batch_write
+
+    assert response.status_code == 500
+    assert len(calls) == store.BATCH_WRITE_MAX_ATTEMPTS
+
+
+def test_deleting_one_habit_leaves_another_habits_dates_alone(client):
+    keep = client.post('/habits', json={'name': 'floss'}).get_json()['id']
+    drop = client.post('/habits', json={'name': 'run'}).get_json()['id']
+    client.put(f'/habits/{keep}/completions/2026-09-03')
+    client.put(f'/habits/{drop}/completions/2026-09-03')
+
+    client.delete(f'/habits/{drop}')
+
+    body = client.get('/habits?from=2026-09-01&to=2026-09-30').get_json()
+    assert body == [{'id': keep, 'name': 'floss', 'dates': ['2026-09-03']}]

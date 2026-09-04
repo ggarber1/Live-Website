@@ -12,6 +12,7 @@ being recorded, which makes marking a habit done idempotent for free.
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,11 @@ if os.environ.get('IS_OFFLINE'):
 LIVS_TABLE = os.environ['LIVS_TABLE']
 
 HABIT_PK = 'HABIT'
+BATCH_WRITE_LIMIT = 25
+# The shared table uses provisioned capacity, so a cascade can be throttled and
+# hand back UnprocessedItems as a matter of course. Retry, but bounded: partial
+# progress persists, so a caller retrying DELETE finishes the job.
+BATCH_WRITE_MAX_ATTEMPTS = 5
 
 
 class HabitNotFound(LookupError):
@@ -176,3 +182,60 @@ def unmark_done(habit_id: str, completion_date: str) -> None:
             'SK': {'S': completion_date},
         },
     )
+
+
+def delete_habit(habit_id: str) -> None:
+    """Delete a habit and every completion recorded against it.
+
+    Completions go first, so an interrupted delete leaves a habit with fewer
+    dates rather than an orphan partition no read path can reach. The
+    HabitNotFound for an unknown id therefore surfaces from the final
+    delete_item, after an empty cascade has already run -- one wasted query on
+    a request that was going to fail anyway, in exchange for keeping the
+    interruption-safe ordering.
+    """
+    completions = _query_all(
+        TableName=LIVS_TABLE,
+        KeyConditionExpression='PK = :pk',
+        ExpressionAttributeValues={':pk': {'S': _completions_pk(habit_id)}},
+        ProjectionExpression='SK',
+    )
+    _delete_completions(habit_id, [item['SK']['S'] for item in completions])
+
+    try:
+        dynamodb_client.delete_item(
+            TableName=LIVS_TABLE,
+            Key={'PK': {'S': HABIT_PK}, 'SK': {'S': habit_id}},
+            ConditionExpression='attribute_exists(SK)',
+        )
+    except dynamodb_client.exceptions.ConditionalCheckFailedException as e:
+        raise HabitNotFound(habit_id) from e
+
+
+def _delete_completions(habit_id: str, completion_dates: list) -> None:
+    """Batch-delete completion items, retrying whatever DynamoDB defers."""
+    pk = _completions_pk(habit_id)
+
+    for start in range(0, len(completion_dates), BATCH_WRITE_LIMIT):
+        chunk = completion_dates[start : start + BATCH_WRITE_LIMIT]
+        requests = [
+            {'DeleteRequest': {'Key': {'PK': {'S': pk}, 'SK': {'S': day}}}}
+            for day in chunk
+        ]
+        attempt = 0
+        while requests:
+            response = dynamodb_client.batch_write_item(
+                RequestItems={LIVS_TABLE: requests}
+            )
+            # A partial batch is a normal response, not an error.
+            requests = response.get('UnprocessedItems', {}).get(LIVS_TABLE, [])
+            if not requests:
+                break
+
+            attempt += 1
+            if attempt >= BATCH_WRITE_MAX_ATTEMPTS:
+                raise RuntimeError(
+                    f'{len(requests)} completions still unprocessed after '
+                    f'{attempt} batch_write_item attempts'
+                )
+            time.sleep(0.05 * 2**attempt)

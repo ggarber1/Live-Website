@@ -81,6 +81,19 @@ def rename_habit(habit_id):
         return make_response(jsonify({'error': 'Failed to rename habit'}), 500)
 
 
+@app.route('/habits/<habit_id>', methods=['DELETE'])
+def delete_habit(habit_id):
+    try:
+        store.delete_habit(habit_id)
+    except store.HabitNotFound:
+        return _habit_not_found(habit_id)
+    except Exception:
+        app.logger.exception('Error deleting habit')
+        return make_response(jsonify({'error': 'Failed to delete habit'}), 500)
+
+    return jsonify({'message': 'Habit deleted successfully'})
+
+
 @app.route('/habits/<habit_id>/completions/<completion_date>', methods=['PUT'])
 def mark_done(habit_id, completion_date):
     try:
