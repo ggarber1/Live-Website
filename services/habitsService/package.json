@@ -1,0 +1,9 @@
+{
+  "name": "habitsService",
+  "version": "1.0.0",
+  "description": "Habit tracker API for livs_website",
+  "author": "",
+  "devDependencies": {
+    "serverless-wsgi": "^3.0.4"
+  }
+}

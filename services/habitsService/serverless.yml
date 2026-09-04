@@ -1,0 +1,57 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: ggarb
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: habitsService
+
+plugins:
+  - serverless-wsgi
+
+custom:
+  wsgi:
+    app: app.app
+    # serverless-wsgi decides whether to pip-install requirements itself by
+    # checking for "serverless-python-requirements" in the plugins list; with
+    # that plugin removed this must be pinned false so wsgi defers to the
+    # built-in python requirements packaging (activated by custom.pythonRequirements below).
+    packRequirements: false
+  # Built-in python requirements packaging activates on this key.
+  pythonRequirements: {}
+
+provider:
+  name: aws
+  runtime: python3.14
+  architecture: arm64
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            # Required by the cascade in delete_habit.
+            - dynamodb:BatchWriteItem
+          Resource:
+            - ${cf:infraService-${sls:stage}.LivsTableArn}
+  environment:
+    LIVS_TABLE: ${cf:infraService-${sls:stage}.LivsTableName}
+
+functions:
+  # One Lambda for the whole service: serverless-wsgi's generated shim adapts the
+  # API Gateway proxy event to WSGI and Flask's own routing takes it from there.
+  api:
+    handler: wsgi_handler.handler
+    # Explicit, because the Serverless Framework default is 6s and a cascade
+    # delete of a long-running habit can spend several seconds in bounded
+    # BatchWriteItem retries. 29s is the ceiling API Gateway allows for a REST
+    # `http` integration, so there is no point going higher.
+    timeout: 29
+    events:
+      - http:
+          path: /
+          method: ANY
+      - http:
+          path: /{proxy+}
+          method: ANY
