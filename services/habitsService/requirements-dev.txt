@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Type stubs -- imported under TYPE_CHECKING only, so they must stay out of
+# requirements.txt or they get packaged into the Lambda for nothing.
+types-boto3-dynamodb
+
+moto[dynamodb]
+pytest
+werkzeug
