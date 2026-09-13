@@ -91,6 +91,17 @@ class TestResolveInsideMusicDir:
 
         assert resolve_inside_music_dir('') is None
 
+    def test_rejects_an_empty_path_before_consulting_music_dir(self, monkeypatch):
+        """Pins the guard's placement: it returns before music_dir() can raise.
+
+        Without this, a refactor could move the falsy check below the config
+        lookup and turn an internal bug into a RuntimeError, with no test
+        noticing.
+        """
+        monkeypatch.delenv('MUSIC_DIR', raising=False)
+
+        assert resolve_inside_music_dir('') is None
+
     def test_accepts_the_root_itself(self, monkeypatch, tmp_path):
         monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
 
