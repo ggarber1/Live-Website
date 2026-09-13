@@ -532,3 +532,66 @@ class TestRemovalAbortRail:
 
 def test_scan_aborted_is_a_runtime_error():
     assert issubclass(scanner.ScanAborted, RuntimeError)
+
+
+class TestOverLengthPaths:
+    def _too_long(self, library):
+        """A real file whose path exceeds MAX_PATH_LENGTH.
+
+        Nested rather than one long name: filesystems cap a single component
+        at 255 bytes, and the total must stay under PATH_MAX (1024 on macOS).
+        """
+        deep = library
+        for _ in range(5):
+            deep = deep / ('d' * 150)
+        deep.mkdir(parents=True)
+        path = deep / 'song.mp3'
+        path.write_bytes(b'audio bytes')
+        assert len(str(path)) > scanner.MAX_PATH_LENGTH
+        return path
+
+    def test_a_path_longer_than_the_column_is_skipped(self, library, fake_db):
+        self._too_long(library)
+
+        counts = scanner.scan_music()
+
+        assert counts['skipped'] == 1
+        assert counts['added'] == 0
+        assert [w for w in fake_db['writes'] if w[0] == 'insert'] == []
+
+    def test_skipping_is_logged(self, library, fake_db, caplog):
+        self._too_long(library)
+
+        with caplog.at_level('ERROR'):
+            scanner.scan_music()
+
+        assert any('longer than' in record.getMessage()
+                   for record in caplog.records)
+
+    def test_a_long_path_does_not_stop_other_files(self, library, fake_db):
+        write_audio(library, 'fine.mp3')
+        self._too_long(library)
+
+        counts = scanner.scan_music()
+
+        assert counts['added'] == 1
+        assert counts['skipped'] == 1
+
+    def test_all_paths_too_long_is_not_mistaken_for_an_unmounted_drive(
+            self, library, fake_db):
+        """found_any means the walk saw candidates, not that any was stored.
+
+        Pins the ordering: the skip must not run before found_any is set, or
+        this reports a missing drive instead of the real problem.
+        """
+        self._too_long(library)
+        fake_db['rows'] = [
+            {'id': i, 'path': f'/old/{i}.mp3', 'size_bytes': 1, 'mtime_ns': 1}
+            for i in range(1, 21)
+        ]
+
+        with pytest.raises(scanner.ScanAborted) as err:
+            scanner.scan_music()
+
+        assert 'MUSIC_DIR' in str(err.value)
+        assert 'mounted' not in str(err.value).lower()

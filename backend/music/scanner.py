@@ -159,6 +159,14 @@ def scan_music(force_removals=False):
         # orphan anything referencing the old id.
         found_any = True
         seen.add(path)
+        if len(path) > MAX_PATH_LENGTH:
+            # The column is VARCHAR(768). MySQL outside strict mode would
+            # truncate, storing a path that can never stream.
+            logger.error(
+                "skipping path longer than %d characters (track.path cannot "
+                "store it intact): %s", MAX_PATH_LENGTH, path)
+            counts['skipped'] += 1
+            continue
         try:
             stat = os.stat(path)
         except OSError as err:
