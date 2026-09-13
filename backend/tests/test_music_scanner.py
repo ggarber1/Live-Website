@@ -377,3 +377,123 @@ def test_removal_is_skipped_after_an_incomplete_walk(library, fake_db):
     deletes = [w for w in fake_db['writes']
                if w[0] == 'execute' and 'DELETE' in w[1]]
     assert deletes == [], "must not delete rows it could not verify"
+
+
+class TestRemovalAbortRail:
+    def test_an_unmounted_drive_aborts_rather_than_deleting_everything(
+            self, library, fake_db):
+        """An unmounted drive looks exactly like an emptied library."""
+        fake_db['rows'] = [
+            {'id': i, 'path': str(library / f'{i}.mp3'),
+             'size_bytes': 10, 'mtime_ns': 10}
+            for i in range(1, 2001)
+        ]
+
+        with pytest.raises(scanner.ScanAborted) as err:
+            scanner.scan_music()
+
+        assert '2000' in str(err.value)
+        assert [w for w in fake_db['writes'] if w[0] == 'execute'] == []
+
+    def test_the_unmounted_message_names_the_root_and_mounting(self, library, fake_db):
+        fake_db['rows'] = [{'id': 1, 'path': 'x', 'size_bytes': 1, 'mtime_ns': 1}]
+
+        with pytest.raises(scanner.ScanAborted) as err:
+            scanner.scan_music()
+
+        assert str(library) in str(err.value)
+        assert 'mount' in str(err.value).lower()
+
+    def test_a_reconfigured_music_dir_does_not_wipe_the_table(self, library, fake_db):
+        """The old library still exists, just not under this root. The walk
+        succeeds and finds files, so no other guard fires."""
+        write_audio(library, 'new.mp3')
+        fake_db['rows'] = [
+            {'id': i, 'path': f'/somewhere/else/{i}.mp3',
+             'size_bytes': 10, 'mtime_ns': 10}
+            for i in range(1, 21)
+        ]
+
+        with pytest.raises(scanner.ScanAborted) as err:
+            scanner.scan_music()
+
+        assert '20' in str(err.value)
+        assert 'MUSIC_DIR' in str(err.value)
+        deletes = [w for w in fake_db['writes']
+                   if w[0] == 'execute' and 'DELETE' in w[1]]
+        assert deletes == [], "must refuse before deleting anything"
+
+    def test_force_removals_allows_it(self, library, fake_db):
+        """The operator can mean it — a genuine bulk reorganisation."""
+        write_audio(library, 'new.mp3')
+        fake_db['rows'] = [
+            {'id': i, 'path': f'/somewhere/else/{i}.mp3',
+             'size_bytes': 10, 'mtime_ns': 10}
+            for i in range(1, 21)
+        ]
+
+        counts = scanner.scan_music(force_removals=True)
+
+        assert counts['removed'] == 20
+        assert counts['added'] == 1
+
+    def test_empty_library_with_empty_table_is_allowed(self, library, fake_db):
+        """A first scan of an empty directory is legitimate, not an abort."""
+        assert scanner.scan_music()['added'] == 0
+
+    def test_a_small_library_is_not_blocked(self, library, fake_db):
+        """Below REMOVAL_FLOOR the proportional check is nuisance: losing a
+        handful of rows is recovered by one rescan."""
+        kept = write_audio(library, 'kept.mp3')
+        fake_db['rows'] = [
+            {'id': 1, 'path': str(kept), 'size_bytes': kept.stat().st_size,
+             'mtime_ns': kept.stat().st_mtime_ns},
+            {'id': 2, 'path': str(library / 'a.mp3'),
+             'size_bytes': 1, 'mtime_ns': 1},
+            {'id': 3, 'path': str(library / 'b.mp3'),
+             'size_bytes': 1, 'mtime_ns': 1},
+        ]
+
+        assert scanner.scan_music()['removed'] == 2
+
+    def test_ordinary_attrition_proceeds(self, library, fake_db):
+        """Deleting a couple of albums is normal and must not need forcing."""
+        rows = []
+        for i in range(1, 19):
+            path = write_audio(library, f'{i}.mp3')
+            rows.append({'id': i, 'path': str(path),
+                         'size_bytes': path.stat().st_size,
+                         'mtime_ns': path.stat().st_mtime_ns})
+        rows += [{'id': 90 + i, 'path': str(library / f'gone{i}.mp3'),
+                  'size_bytes': 1, 'mtime_ns': 1} for i in range(2)]
+        fake_db['rows'] = rows
+
+        assert scanner.scan_music()['removed'] == 2
+
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
+    def test_an_unreadable_directory_still_defers_quietly(self, library, fake_db):
+        """Distinct from the abort rail: an incomplete walk is known-incomplete,
+        so removal is deferred automatically rather than raising."""
+        locked = library / 'Locked'
+        locked.mkdir()
+        (locked / 'hidden.mp3').write_bytes(b'audio bytes')
+        kept = write_audio(library, 'ok.mp3')
+        fake_db['rows'] = [
+            {'id': i, 'path': f'/somewhere/else/{i}.mp3',
+             'size_bytes': 1, 'mtime_ns': 1} for i in range(1, 21)
+        ]
+        fake_db['rows'].append(
+            {'id': 99, 'path': str(kept), 'size_bytes': kept.stat().st_size,
+             'mtime_ns': kept.stat().st_mtime_ns})
+        os.chmod(locked, 0o000)
+        try:
+            counts = scanner.scan_music()
+        finally:
+            os.chmod(locked, 0o755)
+
+        assert counts['removed'] == 0
+        assert counts['unreadable_dirs'] == 1
+
+
+def test_scan_aborted_is_a_runtime_error():
+    assert issubclass(scanner.ScanAborted, RuntimeError)

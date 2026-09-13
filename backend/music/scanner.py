@@ -9,6 +9,20 @@ from music.tags import AUDIO_EXTENSIONS, read_tags
 
 logger = logging.getLogger(__name__)
 
+# A single scan may not delete more than this share of the table without being
+# told to. An unmounted drive, a changed MUSIC_DIR, or the same directory
+# spelled differently (music_dir() resolves symlinks, so stored paths are
+# resolved) all make every indexed path invisible while the walk itself
+# succeeds — which is indistinguishable from the whole library being deleted.
+REMOVAL_LIMIT = 0.5
+# Below this many rows the proportional check is nuisance rather than safety.
+REMOVAL_FLOOR = 10
+
+
+class ScanAborted(RuntimeError):
+    """Raised when a scan's removals look destructive rather than intended."""
+
+
 INSERT_TRACK = """
 INSERT INTO track
     (path, title, artist, album, track_no, duration_seconds,
@@ -76,7 +90,35 @@ def _update_track(track_id, path, tags, stat):
     ))
 
 
-def scan_music():
+def _refuse_mass_removal(root, stale, indexed, found_any):
+    """Raise ScanAborted if deleting `stale` would gut the table.
+
+    Returns normally when the removal looks like ordinary attrition.
+
+    This is deliberately louder than the unreadable-directory case, which
+    defers removal silently: there we know the walk was incomplete, so
+    skipping removal is automatically right. Here the walk succeeded and the
+    result merely looks destructive, which needs a human to confirm.
+    """
+    if not found_any:
+        raise ScanAborted(
+            f"found no audio files under {root} but track holds "
+            f"{len(indexed)} rows; refusing to delete them. "
+            "Is the drive mounted?"
+        )
+    if len(indexed) < REMOVAL_FLOOR:
+        return
+    share = len(stale) / len(indexed)
+    if share > REMOVAL_LIMIT:
+        raise ScanAborted(
+            f"scan would remove {len(stale)} of {len(indexed)} rows "
+            f"({share:.0%}) under {root}; refusing. Did MUSIC_DIR change, or "
+            "the drive remount under a different path? Pass force_removals "
+            "to proceed."
+        )
+
+
+def scan_music(force_removals=False):
     """Index MUSIC_DIR into the track table.
 
     Incremental: a file whose size and mtime_ns match the indexed row is
@@ -88,6 +130,11 @@ def scan_music():
     makes its files invisible, which looks exactly like them being deleted,
     and dropping those rows would be silent data loss.
 
+    Even after a complete walk, a removal that would delete too large a
+    share of the table is refused (see `_refuse_mass_removal`) unless
+    `force_removals` is set, since an unmounted drive or a reconfigured
+    MUSIC_DIR looks identical to a genuinely emptied library.
+
     Returns counts of added, updated, unchanged, removed, skipped and
     unreadable_dirs.
     """
@@ -97,12 +144,14 @@ def scan_music():
     counts = {'added': 0, 'updated': 0, 'unchanged': 0,
               'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
     seen = set()
+    found_any = False
 
     for path in find_audio_files(root, on_error=unreadable.append):
         # Recorded the moment the walk yields it. The file demonstrably
         # exists, so its row must survive even if we then fail to stat or to
         # write it — deleting it would renumber the track on a later scan and
         # orphan anything referencing the old id.
+        found_any = True
         seen.add(path)
         try:
             stat = os.stat(path)
@@ -141,9 +190,12 @@ def scan_music():
             "rows for files beneath them are not deleted", len(unreadable))
         return counts
 
-    for path, row in indexed.items():
-        if path not in seen:
-            execute("DELETE FROM track WHERE id = ?", (row['id'],))
-            counts['removed'] += 1
+    stale = [row for path, row in indexed.items() if path not in seen]
+    if stale and not force_removals:
+        _refuse_mass_removal(root, stale, indexed, found_any)
+
+    for row in stale:
+        execute("DELETE FROM track WHERE id = ?", (row['id'],))
+        counts['removed'] += 1
 
     return counts
