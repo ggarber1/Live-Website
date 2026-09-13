@@ -711,13 +711,22 @@ class TestScanMusicCommand:
 
         assert result.exit_code == 0
 
-    def test_an_abort_exits_non_zero_without_a_traceback(self, monkeypatch):
+    def test_an_abort_exits_non_zero_with_a_clean_message(self, monkeypatch):
+        """Wrapped in ClickException, not propagated raw.
+
+        Asserting `'Traceback' not in result.output` would be vacuous:
+        CliRunner catches exceptions, so a traceback never reaches output
+        either way. What distinguishes the two is `result.exception` — a
+        SystemExit when Click handled it, the ScanAborted itself when not —
+        and whether the operator sees the message at all.
+        """
         result, _ = self._run(
             monkeypatch, error=scanner.ScanAborted('drive not mounted'))
 
         assert result.exit_code != 0
         assert 'drive not mounted' in result.output
-        assert 'Traceback' not in result.output
+        assert not isinstance(result.exception, scanner.ScanAborted), \
+            "must be wrapped in ClickException so the operator sees a message"
 
     def test_an_incomplete_walk_exits_non_zero(self, monkeypatch):
         """Removal was skipped, so the index is knowingly stale."""
