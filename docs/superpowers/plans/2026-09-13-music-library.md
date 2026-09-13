@@ -12,6 +12,38 @@ Spec: `docs/superpowers/specs/2026-09-09-media-library-design.md`
 
 ---
 
+## Status — read this before following any task below
+
+| Task | State | Trust the code blocks here? |
+| --- | --- | --- |
+| 1 `MUSIC_DIR` config | done | **No.** Amended: absolute-path check, falsy-path guard |
+| 2 `track` table | done | **No.** Column is `mtime_ns`, not `mtime` |
+| 3 Tag reading | done | **No.** Amended twice: numeric bounds, text truncation |
+| 4 Scanner, add files | done | **No.** Amended: dotfile skip, `on_error`, per-file write guard |
+| 5 Incremental + removal | done | Section rewritten below; code is the source of truth |
+| 6 Removal abort rail | done | Section rewritten below; widened to proportional |
+| 7 Over-length paths | in progress | Placement instruction below is wrong — see note in that section |
+| 8 CLI command | not started | Unverified against the current scanner |
+| 9-11 Routes | not started | Believed accurate; independent of the scanner |
+| 12 Integration tests | not started | **Stale** — asserts a five-key counts dict; there are six |
+| 13 Manual verification | not started | **Stale** — expected CLI output predates `unreadable_dirs` |
+
+Roughly every safety property of the scanner came out of code review rather
+than this plan, so for Tasks 1-7 **`backend/music/` and its tests are the
+specification**, not the code blocks below. The tasks are left in place for
+the reasoning and the TDD sequence, which still hold.
+
+Two conventions established during implementation and worth keeping:
+
+- Clear bytecode between mutation checks: `find . -name __pycache__ -type d
+  -not -path "./venv/*" -exec rm -rf {} +`. Python invalidates `.pyc` on
+  mtime+size, so two edits inside one second can leave stale bytecode and make
+  a restored file look broken.
+- Every new guard gets proved load-bearing by breaking it deliberately and
+  watching a named test fail.
+
+---
+
 ## Conventions in this codebase
 
 Read these before starting; every task depends on them.
@@ -696,302 +728,56 @@ git commit -m "feat(music): scan a directory into the track table"
 
 ---
 
-### Task 5: Scanner — incremental skip and removal
+### Task 5: Scanner — incremental skip and removal — DONE, superseded
 
-**Files:**
-- Modify: `backend/music/scanner.py`
-- Test: `backend/tests/test_music_scanner.py`
+Implemented in `eacabdf`, `17246a8`, `03902c7`. **The original text of this
+task is not what was built** and has been removed to stop it misleading
+readers. `backend/music/scanner.py` is the source of truth.
 
-- [ ] **Step 1: Write the failing tests**
+What it specified that is now wrong:
 
-Append to `backend/tests/test_music_scanner.py`:
+- A `mtime` column and `int(stat.st_mtime)`. The column is `mtime_ns`, holding
+  `stat.st_mtime_ns`. Whole seconds would treat a file re-tagged twice inside
+  one second as unchanged, and fixing that after data exists is a migration.
+- A five-key counts dict. There are six; `unreadable_dirs` was added in Task 4.
+- `find_audio_files(root)`. It takes `on_error` so unreadable directories are
+  reported rather than silently dropped.
 
-```python
-class TestScanIsIncremental:
-    def test_unchanged_file_is_not_rewritten(self, library, fake_db, monkeypatch):
-        path = write_audio(library, 'song.mp3')
-        stat = path.stat()
-        fake_db['rows'] = [{
-            'id': 7, 'path': str(path),
-            'size_bytes': stat.st_size, 'mtime': int(stat.st_mtime),
-        }]
+What review added beyond the original scope:
 
-        read_calls = []
-        monkeypatch.setattr(scanner, 'read_tags',
-                            lambda p: read_calls.append(p) or {
-                                'title': None, 'artist': None, 'album': None,
-                                'track_no': None, 'duration_seconds': None})
-
-        counts = scanner.scan_music()
-
-        assert counts == {'added': 0, 'updated': 0, 'unchanged': 1,
-                          'removed': 0, 'skipped': 0}
-        assert read_calls == [], "tags must not be re-read for unchanged files"
-        assert [w for w in fake_db['writes'] if w[0] in ('insert', 'execute')] == []
-
-    def test_changed_mtime_updates_in_place(self, library, fake_db):
-        path = write_audio(library, 'song.mp3')
-        fake_db['rows'] = [{
-            'id': 7, 'path': str(path),
-            'size_bytes': path.stat().st_size, 'mtime': 1,
-        }]
-
-        counts = scanner.scan_music()
-
-        assert counts['updated'] == 1
-        assert counts['added'] == 0
-        kinds = [w[0] for w in fake_db['writes']]
-        assert 'insert' not in kinds, "must UPDATE, not delete-and-reinsert"
-        _, query, params = next(w for w in fake_db['writes'] if w[0] == 'execute')
-        assert query.strip().startswith('UPDATE track')
-        assert 7 in params
-
-    def test_changed_size_updates_in_place(self, library, fake_db):
-        path = write_audio(library, 'song.mp3')
-        fake_db['rows'] = [{
-            'id': 7, 'path': str(path),
-            'size_bytes': 999999, 'mtime': int(path.stat().st_mtime),
-        }]
-
-        assert scanner.scan_music()['updated'] == 1
-
-
-class TestScanRemoves:
-    def test_row_whose_file_is_gone_is_deleted(self, library, fake_db):
-        write_audio(library, 'kept.mp3')
-        kept = library / 'kept.mp3'
-        fake_db['rows'] = [
-            {'id': 1, 'path': str(kept),
-             'size_bytes': kept.stat().st_size, 'mtime': int(kept.stat().st_mtime)},
-            {'id': 2, 'path': str(library / 'gone.mp3'),
-             'size_bytes': 10, 'mtime': 10},
-        ]
-
-        counts = scanner.scan_music()
-
-        assert counts['removed'] == 1
-        assert counts['unchanged'] == 1
-        deletes = [w for w in fake_db['writes']
-                   if w[0] == 'execute' and 'DELETE' in w[1]]
-        assert len(deletes) == 1
-        assert deletes[0][2] == (2,)
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q -k "Incremental or Removes"`
-Expected: FAIL — `added == 1` where `unchanged == 1` was expected; the scanner does not read existing rows yet.
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/scanner.py`, add the two statements below `INSERT_TRACK`:
-
-```python
-UPDATE_TRACK = """
-UPDATE track
-   SET path = ?, title = ?, artist = ?, album = ?, track_no = ?,
-       duration_seconds = ?, format = ?, size_bytes = ?, mtime = ?
- WHERE id = ?
-"""
-
-SELECT_INDEXED = "SELECT id, path, size_bytes, mtime FROM track"
-```
-
-Add the update helper next to `_insert_track`:
-
-```python
-def _update_track(track_id, path, tags, stat):
-    execute(UPDATE_TRACK, (
-        path, tags['title'], tags['artist'], tags['album'],
-        tags['track_no'], tags['duration_seconds'],
-        _file_format(path), stat.st_size, int(stat.st_mtime), track_id,
-    ))
-```
-
-Replace the body of `scan_music` with:
-
-```python
-def scan_music():
-    """Index MUSIC_DIR into the track table.
-
-    Incremental: a file whose size and mtime match the indexed row is skipped
-    without re-reading its tags, so rescanning a large library is cheap.
-    Existing rows are updated in place rather than deleted and reinserted, so
-    ids stay stable for future playlist references.
-
-    Returns counts of added, updated, unchanged, removed and skipped files.
-    """
-    root = music_dir()
-    indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
-    counts = {'added': 0, 'updated': 0, 'unchanged': 0,
-              'removed': 0, 'skipped': 0}
-    seen = set()
-
-    for path in find_audio_files(root):
-        try:
-            stat = os.stat(path)
-        except OSError as err:
-            logger.error("skipping unreadable file %s: %s", path, err)
-            counts['skipped'] += 1
-            continue
-
-        seen.add(path)
-        row = indexed.get(path)
-        if (row is not None
-                and row['size_bytes'] == stat.st_size
-                and row['mtime'] == int(stat.st_mtime)):
-            counts['unchanged'] += 1
-            continue
-
-        tags = read_tags(path)
-        if row is None:
-            _insert_track(path, tags, stat)
-            counts['added'] += 1
-        else:
-            _update_track(row['id'], path, tags, stat)
-            counts['updated'] += 1
-
-    for path, row in indexed.items():
-        if path not in seen:
-            execute("DELETE FROM track WHERE id = ?", (row['id'],))
-            counts['removed'] += 1
-
-    return counts
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q`
-Expected: PASS, 11 passed
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd backend
-git add music/scanner.py tests/test_music_scanner.py
-git commit -m "feat(music): make scanning incremental and detect removals"
-```
+- **Removal is skipped entirely when the walk was incomplete.** An unreadable
+  directory hides its files, which is indistinguishable from deletion. Without
+  this, one permission glitch deletes every row beneath that directory.
+- **`seen.add(path)` happens before `os.stat`, not after.** Placed after, a
+  file that exists but cannot be read gets its row deleted — and because it is
+  deleted rather than skipped, the next successful scan reinserts it with a new
+  id, breaking the id stability this task exists to provide.
+- Writes are wrapped in `except (mariadb.IntegrityError, mariadb.DataError)`,
+  not `mariadb.Error`. A lost connection must propagate rather than being
+  miscounted as thousands of skipped files.
 
 ---
 
-### Task 6: Scanner — the zero-files abort rail
+### Task 6: Scanner — the removal abort rail — DONE, superseded
 
-**Files:**
-- Modify: `backend/music/scanner.py`
-- Test: `backend/tests/test_music_scanner.py`
+Implemented in `2e63fc2`, `7da9e61`. Original text removed for the same reason.
 
-An unmounted drive is indistinguishable from an emptied one by file count alone, and the naive behaviour deletes the whole library. This is a required rail, not an optional guard.
+It specified only a zero-files guard. That catches an unmounted drive and
+nothing else. Review established that several ordinary events make every
+stored path invisible while the walk succeeds perfectly: `MUSIC_DIR` changed
+to another readable directory, the same directory spelled differently (paths
+are stored resolved, since `music_dir()` calls `realpath()`), or a directory
+renamed to start with a dot.
 
-- [ ] **Step 1: Write the failing tests**
+So the rail is proportional: a scan may not delete more than `REMOVAL_LIMIT`
+(0.5) of the table, with zero-files as the limiting case. Libraries under
+`REMOVAL_FLOOR` (10) rows are exempt, since the check is nuisance at that size.
+`scan_music(force_removals=True)` overrides it.
 
-Append to `backend/tests/test_music_scanner.py`:
-
-```python
-class TestZeroFilesAbortRail:
-    def test_aborts_rather_than_deleting_everything(self, library, fake_db):
-        """An unmounted drive looks exactly like an emptied library."""
-        fake_db['rows'] = [
-            {'id': i, 'path': str(library / f'{i}.mp3'),
-             'size_bytes': 10, 'mtime': 10}
-            for i in range(1, 2001)
-        ]
-
-        with pytest.raises(scanner.ScanAborted) as err:
-            scanner.scan_music()
-
-        assert '2000' in str(err.value)
-        assert [w for w in fake_db['writes'] if w[0] == 'execute'] == []
-
-    def test_message_mentions_the_root_and_mounting(self, library, fake_db):
-        fake_db['rows'] = [{'id': 1, 'path': 'x', 'size_bytes': 1, 'mtime': 1}]
-
-        with pytest.raises(scanner.ScanAborted) as err:
-            scanner.scan_music()
-
-        assert str(library) in str(err.value)
-        assert 'mount' in str(err.value).lower()
-
-    def test_empty_library_with_empty_table_is_allowed(self, library, fake_db):
-        """A first scan of an empty directory is legitimate, not an abort."""
-        assert scanner.scan_music()['added'] == 0
-
-    def test_one_file_remaining_does_not_abort(self, library, fake_db):
-        """The rail is specifically about finding zero files, not about ratios."""
-        path = write_audio(library, 'survivor.mp3')
-        fake_db['rows'] = [
-            {'id': 1, 'path': str(path),
-             'size_bytes': path.stat().st_size, 'mtime': int(path.stat().st_mtime)},
-            {'id': 2, 'path': str(library / 'gone.mp3'),
-             'size_bytes': 10, 'mtime': 10},
-        ]
-
-        assert scanner.scan_music()['removed'] == 1
-
-
-def test_scan_aborted_is_a_runtime_error():
-    assert issubclass(scanner.ScanAborted, RuntimeError)
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q -k "Abort or aborted"`
-Expected: FAIL — `AttributeError: module 'music.scanner' has no attribute 'ScanAborted'`
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/scanner.py`, add after `logger = logging.getLogger(__name__)`:
-
-```python
-class ScanAborted(RuntimeError):
-    """Raised when a scan looks destructive rather than legitimate."""
-```
-
-In `scan_music`, the walk must be materialised before any writes so the rail can
-be checked first. Replace:
-
-```python
-    indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
-    counts = {'added': 0, 'updated': 0, 'unchanged': 0,
-              'removed': 0, 'skipped': 0}
-    seen = set()
-
-    for path in find_audio_files(root):
-```
-
-with:
-
-```python
-    indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
-    found = list(find_audio_files(root))
-
-    # An unmounted drive is indistinguishable from an emptied library by file
-    # count, and deleting every row is unrecoverable. Refuse instead.
-    if not found and indexed:
-        raise ScanAborted(
-            f"found no audio files under {root} but track holds "
-            f"{len(indexed)} rows; refusing to delete them. "
-            "Is the drive mounted?"
-        )
-
-    counts = {'added': 0, 'updated': 0, 'unchanged': 0,
-              'removed': 0, 'skipped': 0}
-    seen = set()
-
-    for path in found:
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q`
-Expected: PASS, 16 passed
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd backend
-git add music/scanner.py tests/test_music_scanner.py
-git commit -m "feat(music): abort scan rather than empty the library"
-```
+The asymmetry with the unreadable-directory case is deliberate and tested both
+ways: an incomplete walk defers removal silently, because we know it was
+incomplete; a mass removal after a complete walk raises, because it only looks
+destructive and a human should decide.
 
 ---
 
