@@ -148,7 +148,10 @@ TABLE_DDL = {
     # dropping it loses nothing. path is the natural key and rows are updated in
     # place so ids stay stable for future playlist references.
     # VARCHAR(768) is the longest utf8mb4 column that fits a full UNIQUE index
-    # inside InnoDB's 3072-byte limit.
+    # inside InnoDB's 3072-byte limit — 768 * 4 bytes lands exactly on it, with
+    # no slack. On a server defaulting to ROW_FORMAT=COMPACT (767-byte cap)
+    # create_tables() fails loudly with an index-too-long error rather than
+    # silently truncating, which is the failure mode we want.
     'track': """
     CREATE TABLE IF NOT EXISTS track (
         id INT AUTO_INCREMENT PRIMARY KEY,

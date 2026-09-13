@@ -31,8 +31,11 @@ REQUESTS = [
     ('delete', '/recipes/1', None),
 ]
 
-# BIGINT must precede INT: the alternation is ordered, and `INT` would
-# otherwise never match the start of `BIGINT`.
+# Every type used in TABLE_DDL has to be listed here, or its columns are
+# invisible to this guard: BIGINT was missing, which silently hid size_bytes
+# and mtime. Position within the alternation does not matter — none of these
+# types is a prefix of another, so each branch is only ever tried at the one
+# position after the column name.
 COLUMN_TYPES = 'BIGINT|INT|VARCHAR|TEXT|JSON|TIMESTAMP|DATE'
 
 
@@ -100,12 +103,16 @@ def test_track_table_exists_with_the_columns_the_scanner_needs():
 
 
 def test_track_path_is_uniquely_indexed_in_full():
-    """A prefix index would let two long paths collide into one track."""
+    """A prefix index would let two long paths collide into one track.
+
+    Matched against the `path` line specifically: a bare `'VARCHAR(768)' in ddl`
+    would also be satisfied by some other column happening to be 768 wide.
+    """
     ddl = TABLE_DDL['track']
 
-    assert 'VARCHAR(768)' in ddl
-    assert 'UNIQUE' in ddl
-    assert 'path(' not in ddl
+    assert re.search(r'^\s*path\s+VARCHAR\(768\)\s+NOT NULL\s+UNIQUE\s*,\s*$',
+                     ddl, re.M)
+    assert 'path(' not in ddl, "a prefix index only enforces uniqueness on the prefix"
 
 
 @pytest.fixture
@@ -147,4 +154,5 @@ def test_max_path_length_matches_the_track_path_column():
     """The scanner skips over-length paths; its limit must track the column."""
     from music.config import MAX_PATH_LENGTH
 
-    assert f'VARCHAR({MAX_PATH_LENGTH})' in TABLE_DDL['track']
+    assert re.search(rf'^\s*path\s+VARCHAR\({MAX_PATH_LENGTH}\)',
+                     TABLE_DDL['track'], re.M)
