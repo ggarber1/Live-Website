@@ -17,6 +17,23 @@ class TestTrackNumber:
     def test_parses_what_it_can(self, raw, expected):
         assert track_number(raw) == expected
 
+    @pytest.mark.parametrize('raw', [
+        '99999999999',   # larger than INT
+        '2147483648',    # one past INT max
+        '10000',         # past our own ceiling
+        '0',             # track numbering is 1-based
+        '-5',            # negative
+    ])
+    def test_rejects_values_unfit_for_the_column(self, raw):
+        """An out-of-range insert would abort the whole scan, not one file."""
+        assert track_number(raw) is None
+
+    def test_accepts_the_bottom_of_the_range(self):
+        assert track_number('1') == 1
+
+    def test_accepts_the_top_of_the_range(self):
+        assert track_number('9999') == 9999
+
 
 class TestReadTags:
     def test_unreadable_file_falls_back_to_the_filename(self, tmp_path):
@@ -49,6 +66,29 @@ def test_audio_extensions_are_lowercase_with_dots():
     for ext in AUDIO_EXTENSIONS:
         assert ext.startswith('.')
         assert ext == ext.lower()
+
+
+def test_valid_file_with_no_tag_block(tmp_path):
+    """Distinct from an unparseable file: mutagen succeeds, .tags is None.
+
+    Built with the stdlib so the test needs no encoder.
+    """
+    import wave
+
+    path = tmp_path / 'Untagged Song.wav'
+    with wave.open(str(path), 'wb') as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(8000)
+        handle.writeframes(b'\x00\x00' * 8000)
+
+    tags = read_tags(str(path))
+
+    assert tags['title'] == 'Untagged Song'
+    assert tags['artist'] is None
+    assert tags['album'] is None
+    assert tags['track_no'] is None
+    assert tags['duration_seconds'] == 1
 
 
 class FakeInfo:
@@ -122,5 +162,11 @@ class TestReadTagsExtraction:
     def test_missing_info_leaves_duration_null(self, tagged, tmp_path):
         """Some formats give a mapping with no info attribute."""
         tagged({'title': ['x']}, length=None)
+
+        assert read_tags(str(tmp_path / 'x.mp3'))['duration_seconds'] is None
+
+    def test_implausible_duration_is_dropped(self, tagged, tmp_path):
+        """A corrupt header must not put an out-of-range value in an INT."""
+        tagged({'title': ['x']}, length=1e12)
 
         assert read_tags(str(tmp_path / 'x.mp3'))['duration_seconds'] is None

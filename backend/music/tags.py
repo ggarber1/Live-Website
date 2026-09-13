@@ -5,18 +5,32 @@ import mutagen
 
 AUDIO_EXTENSIONS = ('.mp3', '.flac', '.m4a', '.ogg', '.wav')
 
+# track_no and duration_seconds are INT columns. Tags hold arbitrary garbage,
+# and MySQL in strict mode rejects an out-of-range value outright — which would
+# abort an entire scan over a single mistagged file.
+MAX_SIGNED_INT = 2147483647
+MAX_TRACK_NUMBER = 9999
+
 logger = logging.getLogger(__name__)
 
 
 def track_number(raw):
-    """Parse a track number, which arrives as "3", "03" or "3/12"."""
+    """Parse a track number, which arrives as "3", "03" or "3/12".
+
+    Returns None for anything outside 1..MAX_TRACK_NUMBER — negatives, zero,
+    and absurd values from malformed tags. The column is INT, and a value that
+    does not fit fails the insert and takes the rest of the scan with it.
+    """
     if raw is None:
         return None
     text = str(raw).split('/')[0].strip()
     try:
-        return int(text)
+        number = int(text)
     except ValueError:
         return None
+    if not 1 <= number <= MAX_TRACK_NUMBER:
+        return None
+    return number
 
 
 def _first(audio, key):
@@ -50,7 +64,10 @@ def read_tags(path):
         album = _first(audio, 'album')
         number = track_number(_first(audio, 'tracknumber'))
         length = getattr(getattr(audio, 'info', None), 'length', None)
-        if length:
+        # A corrupt header can claim an implausible length, and the column is
+        # INT. Note this also drops a genuine 0.0-second file, which is
+        # degenerate data either way.
+        if length is not None and 0 < length <= MAX_SIGNED_INT:
             duration = int(length)
 
     return {
