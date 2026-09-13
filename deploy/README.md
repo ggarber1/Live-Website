@@ -62,7 +62,7 @@ own:
 ./venv/bin/flask --app app init-db
 ```
 
-Expect `Tables ready: todo, recipes, habits, blog`. It is safe to re-run.
+Expect `Tables ready: todo, recipes, habits, blog, track`. It is safe to re-run.
 
 ## 6. Index the music library
 

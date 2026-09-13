@@ -249,11 +249,13 @@ def scan_music_command(force_removals):
             "unreadable files {skipped_unreadable}, "
             "rejected {skipped_rejected})".format(**counts))
 
-    if counts['unreadable_dirs']:
+    blocked = counts['unreadable_dirs']
+    if blocked:
         # Removal detection was skipped, so the index is knowingly stale.
         # Exit non-zero: this runs from a timer, and a silent partial success
         # is exactly the failure this scanner exists to avoid.
         raise click.ClickException(
-            f"{counts['unreadable_dirs']} directories could not be read, so "
-            "stale rows were left in place. Fix their permissions and re-run."
+            f"{blocked} director{'y' if blocked == 1 else 'ies'} could not be "
+            "read, so stale rows were left in place. Fix the permissions and "
+            "re-run."
         )
