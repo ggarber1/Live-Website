@@ -1,0 +1,34 @@
+[Unit]
+Description=Liv's website API
+# Wait for the database, otherwise the first requests after a reboot fail.
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+# EDIT: the user that owns the checkout on the Pi.
+User=pi
+Group=pi
+
+# EDIT: where the repo lives on the Pi. WorkingDirectory must be backend/ —
+# imports resolve relative to it (`from app import app`, `from api import ...`).
+WorkingDirectory=/home/pi/livs_website/backend
+EnvironmentFile=/home/pi/livs_website/backend/.env
+ExecStart=/home/pi/livs_website/backend/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 0.0.0.0:5000 \
+    --access-logfile - \
+    --error-logfile - \
+    app:app
+
+Restart=on-failure
+RestartSec=5
+
+# The API only needs to read its own checkout and talk to MySQL's socket.
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/pi/livs_website
+
+[Install]
+WantedBy=multi-user.target

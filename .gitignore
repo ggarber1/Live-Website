@@ -4,3 +4,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
+
+# virtualenvs
+venv/
+.venv/
+env/
+# `python -m venv activate`, meant as `source venv/bin/activate`
+activate/
