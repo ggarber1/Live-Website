@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from music.config import MAX_PATH_LENGTH, music_dir, resolve_inside_music_dir
+from music.config import music_dir, resolve_inside_music_dir
 
 
 class TestMusicDir:
@@ -106,8 +106,3 @@ class TestResolveInsideMusicDir:
         monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
 
         assert resolve_inside_music_dir(str(tmp_path)) == os.path.realpath(str(tmp_path))
-
-
-def test_max_path_length_matches_the_column():
-    """track.path is VARCHAR(768); longer paths cannot be stored intact."""
-    assert MAX_PATH_LENGTH == 768

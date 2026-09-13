@@ -144,6 +144,26 @@ TABLE_DDL = {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
+    # Disk is the source of truth for this table: scan-music rebuilds it, and
+    # dropping it loses nothing. path is the natural key and rows are updated in
+    # place so ids stay stable for future playlist references.
+    # VARCHAR(768) is the longest utf8mb4 column that fits a full UNIQUE index
+    # inside InnoDB's 3072-byte limit.
+    'track': """
+    CREATE TABLE IF NOT EXISTS track (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        path VARCHAR(768) NOT NULL UNIQUE,
+        title VARCHAR(255),
+        artist VARCHAR(255),
+        album VARCHAR(255),
+        track_no INT,
+        duration_seconds INT,
+        format VARCHAR(16) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        mtime BIGINT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
 }
 
 

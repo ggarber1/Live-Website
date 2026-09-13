@@ -31,7 +31,9 @@ REQUESTS = [
     ('delete', '/recipes/1', None),
 ]
 
-COLUMN_TYPES = 'INT|VARCHAR|TEXT|JSON|TIMESTAMP|DATE'
+# BIGINT must precede INT: the alternation is ordered, and `INT` would
+# otherwise never match the start of `BIGINT`.
+COLUMN_TYPES = 'BIGINT|INT|VARCHAR|TEXT|JSON|TIMESTAMP|DATE'
 
 
 def ddl_columns(ddl):
@@ -89,6 +91,23 @@ def test_every_table_has_an_id_and_created_at():
         assert {'id', 'created_at'} <= ddl_columns(ddl), name
 
 
+def test_track_table_exists_with_the_columns_the_scanner_needs():
+    columns = ddl_columns(TABLE_DDL['track'])
+
+    assert {'id', 'path', 'title', 'artist', 'album', 'track_no',
+            'duration_seconds', 'format', 'size_bytes', 'mtime',
+            'created_at'} <= columns
+
+
+def test_track_path_is_uniquely_indexed_in_full():
+    """A prefix index would let two long paths collide into one track."""
+    ddl = TABLE_DDL['track']
+
+    assert 'VARCHAR(768)' in ddl
+    assert 'UNIQUE' in ddl
+    assert 'path(' not in ddl
+
+
 @pytest.fixture
 def ddl_run(monkeypatch):
     """Record the statements create_tables would execute."""
@@ -122,3 +141,10 @@ def test_init_db_command_is_registered():
     from app import app as flask_app
 
     assert 'init-db' in flask_app.cli.commands
+
+
+def test_max_path_length_matches_the_track_path_column():
+    """The scanner skips over-length paths; its limit must track the column."""
+    from music.config import MAX_PATH_LENGTH
+
+    assert f'VARCHAR({MAX_PATH_LENGTH})' in TABLE_DDL['track']
