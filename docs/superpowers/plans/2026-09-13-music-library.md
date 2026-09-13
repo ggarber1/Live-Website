@@ -24,7 +24,7 @@ Spec: `docs/superpowers/specs/2026-09-09-media-library-design.md`
 | 6 Removal abort rail | done | Section rewritten below; widened to proportional |
 | 7 Over-length paths | done | Section rewritten below; placement is the substance |
 | 8 CLI command | done | Section rewritten below; exit-code policy is the substance |
-| 9-11 Routes | not started | Believed accurate; independent of the scanner |
+| 9-11 Routes | not started | Mostly accurate, but Task 9's `TRACK_ROW` fixture had a stale `mtime` key (fixed) |
 | 12 Integration tests | not started | **Stale** — asserts a five-key counts dict; there are nine |
 | 13 Manual verification | not started | **Stale** — expected CLI output predates the skip breakdown |
 
@@ -905,7 +905,7 @@ TRACK_ROW = {
     'id': 1, 'path': '/tmp/livs-test-music/a.mp3', 'title': 'Space Song',
     'artist': 'Beach House', 'album': 'Depression Cherry', 'track_no': 5,
     'duration_seconds': 301, 'format': 'mp3', 'size_bytes': 7_200_000,
-    'mtime': 1_700_000_000, 'created_at': None,
+    'mtime_ns': 1_700_000_000_000_000_000, 'created_at': None,
 }
 
 
@@ -1817,12 +1817,12 @@ directly and leaves the empty `playlist/` directory alone.
 | `MAX_PATH_LENGTH` matching the column | 1 |
 | Path containment after symlink resolution | 1, 11 |
 | `track` DDL, `VARCHAR(768)` full unique index | 2 |
-| `mtime` as integer epoch | 2 |
+| `mtime_ns` as integer nanoseconds | 2, corrected in 4 |
 | Tag reading with filename fallback | 3 |
 | Per-file tag failure tolerance | 3 |
 | Audio extension list | 3 |
 | Recursive walk, upsert by path | 4 |
-| Incremental skip on size and mtime | 5 |
+| Incremental skip on size and `mtime_ns` | 5 |
 | Update in place, never delete-and-reinsert | 5, 12 |
 | Removal detection | 5 |
 | Zero-files abort rail | 6, 12 |
