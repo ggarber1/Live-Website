@@ -264,7 +264,13 @@ class TestScanIsIncremental:
         assert scanner.scan_music()['updated'] == 1
 
     def test_an_update_keeps_the_existing_id(self, library, fake_db):
-        """Playlists will reference track.id; re-tagging must not renumber."""
+        """Playlists will reference track.id; re-tagging must not renumber.
+
+        Asserts against the UPDATE specifically, and that no DELETE or INSERT
+        happened. Matching merely "the first execute call" passes by accident
+        under a delete-then-insert implementation, because that DELETE also
+        carries id 7 as its only parameter.
+        """
         path = write_audio(library, 'song.mp3')
         fake_db['rows'] = [{
             'id': 7, 'path': str(path), 'size_bytes': 1, 'mtime_ns': 1,
@@ -272,8 +278,13 @@ class TestScanIsIncremental:
 
         scanner.scan_music()
 
-        _, _, params = next(w for w in fake_db['writes'] if w[0] == 'execute')
-        assert params[-1] == 7, "the id must be the WHERE target, unchanged"
+        updates = [w for w in fake_db['writes']
+                   if w[0] == 'execute' and w[1].strip().startswith('UPDATE track')]
+        assert len(updates) == 1, "exactly one UPDATE, no re-creation"
+        assert updates[0][2][-1] == 7, "the id must be the WHERE target, unchanged"
+        assert not [w for w in fake_db['writes'] if w[0] == 'insert']
+        assert not [w for w in fake_db['writes']
+                    if w[0] == 'execute' and 'DELETE' in w[1]]
 
     def test_a_rejected_update_skips_only_that_file(self, library, fake_db, monkeypatch):
         import mariadb
