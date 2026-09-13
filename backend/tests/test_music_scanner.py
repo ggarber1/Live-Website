@@ -701,7 +701,7 @@ class TestScanMusicCommand:
         assert result.exit_code == 0, result.output
         assert 'skipped 4' in result.output
         assert 'too long 1' in result.output
-        assert 'unreadable 2' in result.output
+        assert 'unreadable files 2' in result.output
         assert 'rejected 1' in result.output
 
     def test_skipped_files_alone_still_exit_zero(self, monkeypatch):
@@ -736,6 +736,25 @@ class TestScanMusicCommand:
         assert result.exit_code != 0
         assert '3' in result.output
         assert 'added 2' in result.output, "counts still reported before failing"
+
+    def test_an_incomplete_walk_explains_what_to_do(self, monkeypatch):
+        result, _ = self._run(monkeypatch, counts_with(unreadable_dirs=3))
+
+        assert result.exit_code != 0
+        assert 'stale rows were left in place' in result.output
+        assert 'permissions' in result.output
+
+    def test_skips_and_an_incomplete_walk_report_together(self, monkeypatch):
+        """Counts first, then the breakdown, then the failure — losing the
+        numbers to an early raise would defeat the per-reason split."""
+        result, _ = self._run(monkeypatch, counts_with(
+            added=10, skipped=2, skipped_unreadable=2, unreadable_dirs=1))
+
+        assert result.exit_code != 0
+        lines = [line for line in result.output.splitlines() if line.strip()]
+        assert 'added 10' in lines[0]
+        assert 'skipped 2' in lines[1]
+        assert 'stale rows were left in place' in lines[-1]
 
     def test_force_removals_defaults_off(self, monkeypatch):
         _, seen = self._run(monkeypatch)

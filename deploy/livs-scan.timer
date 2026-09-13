@@ -1,0 +1,11 @@
+[Unit]
+Description=Index Liv's music library nightly
+
+[Timer]
+OnCalendar=*-*-* 04:17:00
+# Run on next boot if the Pi was off at 04:17.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

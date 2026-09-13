@@ -1,0 +1,19 @@
+[Unit]
+Description=Index Liv's music library
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# EDIT: the user that owns the checkout on the Pi.
+User=pi
+Group=pi
+# EDIT: where the repo lives on the Pi.
+WorkingDirectory=/home/pi/livs_website/backend
+EnvironmentFile=/home/pi/livs_website/backend/.env
+ExecStart=/home/pi/livs_website/backend/venv/bin/flask --app app scan-music
+
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/pi/livs_website

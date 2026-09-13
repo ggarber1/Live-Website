@@ -116,7 +116,7 @@ def _refuse_mass_removal(root, stale, indexed, found_any):
         raise ScanAborted(
             f"found no audio files under {root} but track holds "
             f"{len(indexed)} rows; refusing to delete them. "
-            "Is the drive mounted? Pass force_removals to proceed anyway."
+            "Is the drive mounted? Pass --force-removals to proceed anyway."
         )
     if len(indexed) < REMOVAL_FLOOR:
         return
@@ -126,7 +126,7 @@ def _refuse_mass_removal(root, stale, indexed, found_any):
             f"scan would remove {len(stale)} of {len(indexed)} rows "
             f"({share:.0%}) under {root}; refusing. Did MUSIC_DIR change, or "
             "did the drive remount under a different path? Pass "
-            "force_removals to proceed anyway."
+            "--force-removals to proceed anyway."
         )
 
 
@@ -246,7 +246,7 @@ def scan_music_command(force_removals):
     if counts['skipped']:
         click.echo(
             "skipped {skipped} (too long {skipped_too_long}, "
-            "unreadable {skipped_unreadable}, "
+            "unreadable files {skipped_unreadable}, "
             "rejected {skipped_rejected})".format(**counts))
 
     if counts['unreadable_dirs']:
