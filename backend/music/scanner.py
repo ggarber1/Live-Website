@@ -1,7 +1,9 @@
 import logging
 import os
 
+import click
 import mariadb
+from flask.cli import with_appcontext
 
 from database.db import execute, fetch_all, insert
 from music.config import MAX_PATH_LENGTH, music_dir
@@ -225,3 +227,33 @@ def scan_music(force_removals=False):
         counts['removed'] += 1
 
     return counts
+
+
+@click.command('scan-music')
+@click.option('--force-removals', is_flag=True,
+              help="Delete stale rows even when that would gut the table.")
+@with_appcontext
+def scan_music_command(force_removals):
+    """Index MUSIC_DIR into the track table."""
+    try:
+        counts = scan_music(force_removals=force_removals)
+    except ScanAborted as err:
+        raise click.ClickException(str(err))
+
+    click.echo(
+        "added {added}, updated {updated}, unchanged {unchanged}, "
+        "removed {removed}".format(**counts))
+    if counts['skipped']:
+        click.echo(
+            "skipped {skipped} (too long {skipped_too_long}, "
+            "unreadable {skipped_unreadable}, "
+            "rejected {skipped_rejected})".format(**counts))
+
+    if counts['unreadable_dirs']:
+        # Removal detection was skipped, so the index is knowingly stale.
+        # Exit non-zero: this runs from a timer, and a silent partial success
+        # is exactly the failure this scanner exists to avoid.
+        raise click.ClickException(
+            f"{counts['unreadable_dirs']} directories could not be read, so "
+            "stale rows were left in place. Fix their permissions and re-run."
+        )

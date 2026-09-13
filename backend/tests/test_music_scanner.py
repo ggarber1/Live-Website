@@ -642,3 +642,98 @@ class TestOverLengthPaths:
 
         assert counts['added'] == 0
         assert counts['skipped_too_long'] == 1
+
+
+COUNTS = {
+    'added': 0, 'updated': 0, 'unchanged': 0, 'removed': 0, 'skipped': 0,
+    'skipped_too_long': 0, 'skipped_unreadable': 0, 'skipped_rejected': 0,
+    'unreadable_dirs': 0,
+}
+
+
+def counts_with(**overrides):
+    return {**COUNTS, **overrides}
+
+
+class TestScanMusicCommand:
+    def _run(self, monkeypatch, counts=None, error=None, args=None):
+        from app import app as flask_app
+
+        seen = {}
+
+        def fake_scan(force_removals=False):
+            seen['force_removals'] = force_removals
+            if error is not None:
+                raise error
+            return counts if counts is not None else counts_with()
+
+        monkeypatch.setattr(scanner, 'scan_music', fake_scan)
+        result = flask_app.test_cli_runner().invoke(args=['scan-music'] + (args or []))
+        return result, seen
+
+    def test_command_is_registered(self):
+        from app import app as flask_app
+
+        assert 'scan-music' in flask_app.cli.commands
+
+    def test_reports_the_headline_counts(self, monkeypatch):
+        result, _ = self._run(monkeypatch, counts_with(
+            added=3, updated=2, unchanged=10, removed=1))
+
+        assert result.exit_code == 0, result.output
+        assert 'added 3' in result.output
+        assert 'updated 2' in result.output
+        assert 'unchanged 10' in result.output
+        assert 'removed 1' in result.output
+
+    def test_a_clean_scan_says_nothing_about_skips(self, monkeypatch):
+        result, _ = self._run(monkeypatch, counts_with(added=5))
+
+        assert result.exit_code == 0
+        assert 'skipped' not in result.output
+
+    def test_skips_are_broken_down_by_reason(self, monkeypatch):
+        """One total is not actionable: each reason needs a different fix."""
+        result, _ = self._run(monkeypatch, counts_with(
+            added=1, skipped=4, skipped_too_long=1,
+            skipped_unreadable=2, skipped_rejected=1))
+
+        assert result.exit_code == 0, result.output
+        assert 'skipped 4' in result.output
+        assert 'too long 1' in result.output
+        assert 'unreadable 2' in result.output
+        assert 'rejected 1' in result.output
+
+    def test_skipped_files_alone_still_exit_zero(self, monkeypatch):
+        """A permanently bad file must not fail a nightly timer forever."""
+        result, _ = self._run(monkeypatch, counts_with(skipped=9,
+                                                       skipped_rejected=9))
+
+        assert result.exit_code == 0
+
+    def test_an_abort_exits_non_zero_without_a_traceback(self, monkeypatch):
+        result, _ = self._run(
+            monkeypatch, error=scanner.ScanAborted('drive not mounted'))
+
+        assert result.exit_code != 0
+        assert 'drive not mounted' in result.output
+        assert 'Traceback' not in result.output
+
+    def test_an_incomplete_walk_exits_non_zero(self, monkeypatch):
+        """Removal was skipped, so the index is knowingly stale."""
+        result, _ = self._run(monkeypatch, counts_with(added=2,
+                                                       unreadable_dirs=3))
+
+        assert result.exit_code != 0
+        assert '3' in result.output
+        assert 'added 2' in result.output, "counts still reported before failing"
+
+    def test_force_removals_defaults_off(self, monkeypatch):
+        _, seen = self._run(monkeypatch)
+
+        assert seen['force_removals'] is False
+
+    def test_force_removals_flag_is_passed_through(self, monkeypatch):
+        _, seen = self._run(monkeypatch, args=['--force-removals'])
+
+        assert seen['force_removals'] is True
