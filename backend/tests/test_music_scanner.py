@@ -325,6 +325,32 @@ class TestScanRemoves:
         assert len(deletes) == 1
         assert deletes[0][2] == (2,)
 
+    def test_a_file_that_cannot_be_stat_ed_keeps_its_row(self, library, fake_db,
+                                                         monkeypatch):
+        """It is unreadable, not gone. Deleting the row would renumber it on
+        the next successful scan and orphan any reference to the old id."""
+        path = write_audio(library, 'song.mp3')
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path), 'size_bytes': 1, 'mtime_ns': 1,
+        }]
+
+        real_stat = os.stat
+
+        def failing_stat(target, *args, **kwargs):
+            if str(target).endswith('song.mp3'):
+                raise OSError(13, 'Permission denied')
+            return real_stat(target, *args, **kwargs)
+
+        monkeypatch.setattr(scanner.os, 'stat', failing_stat)
+
+        counts = scanner.scan_music()
+
+        assert counts['skipped'] == 1
+        assert counts['removed'] == 0, "the file exists; its row must survive"
+        deletes = [w for w in fake_db['writes']
+                   if w[0] == 'execute' and 'DELETE' in w[1]]
+        assert deletes == []
+
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
 def test_removal_is_skipped_after_an_incomplete_walk(library, fake_db):

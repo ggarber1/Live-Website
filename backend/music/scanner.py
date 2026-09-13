@@ -99,6 +99,11 @@ def scan_music():
     seen = set()
 
     for path in find_audio_files(root, on_error=unreadable.append):
+        # Recorded the moment the walk yields it. The file demonstrably
+        # exists, so its row must survive even if we then fail to stat or to
+        # write it — deleting it would renumber the track on a later scan and
+        # orphan anything referencing the old id.
+        seen.add(path)
         try:
             stat = os.stat(path)
         except OSError as err:
@@ -106,9 +111,6 @@ def scan_music():
             counts['skipped'] += 1
             continue
 
-        # Recorded before the write is attempted: a file that exists but could
-        # not be written must not then have its row deleted below.
-        seen.add(path)
         row = indexed.get(path)
         if (row is not None
                 and row['size_bytes'] == stat.st_size
