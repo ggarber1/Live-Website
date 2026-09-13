@@ -124,7 +124,9 @@ class TestScanAddsFiles:
         counts = scanner.scan_music()
 
         assert counts == {'added': 0, 'updated': 0, 'unchanged': 0,
-                          'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+                          'removed': 0, 'skipped': 0, 'skipped_too_long': 0,
+                          'skipped_unreadable': 0, 'skipped_rejected': 0,
+                          'unreadable_dirs': 0}
 
     def test_an_unreadable_file_is_skipped_not_fatal(self, library, fake_db, monkeypatch):
         write_audio(library, 'ok.mp3')
@@ -143,6 +145,7 @@ class TestScanAddsFiles:
 
         assert counts['added'] == 1
         assert counts['skipped'] == 1
+        assert counts['skipped_unreadable'] == 1
 
     def test_a_rejected_row_skips_only_that_file(self, library, fake_db, monkeypatch):
         """One bad row must not abandon the rest of a large scan."""
@@ -166,6 +169,7 @@ class TestScanAddsFiles:
 
         assert counts['added'] == 2
         assert counts['skipped'] == 1
+        assert counts['skipped_rejected'] == 1
         assert len(attempts) == 3, "the scan must continue past the failure"
 
     def test_a_lost_connection_aborts_instead_of_skipping_everything(
@@ -233,7 +237,9 @@ class TestScanIsIncremental:
         counts = scanner.scan_music()
 
         assert counts == {'added': 0, 'updated': 0, 'unchanged': 1,
-                          'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+                          'removed': 0, 'skipped': 0, 'skipped_too_long': 0,
+                          'skipped_unreadable': 0, 'skipped_rejected': 0,
+                          'unreadable_dirs': 0}
         assert read_calls == [], "tags must not be re-read for unchanged files"
         assert [w for w in fake_db['writes'] if w[0] in ('insert', 'execute')] == []
 
@@ -304,6 +310,7 @@ class TestScanIsIncremental:
 
         assert counts['updated'] == 0
         assert counts['skipped'] == 1
+        assert counts['skipped_rejected'] == 1
 
 
 class TestScanRemoves:
@@ -346,6 +353,7 @@ class TestScanRemoves:
         counts = scanner.scan_music()
 
         assert counts['skipped'] == 1
+        assert counts['skipped_unreadable'] == 1
         assert counts['removed'] == 0, "the file exists; its row must survive"
         deletes = [w for w in fake_db['writes']
                    if w[0] == 'execute' and 'DELETE' in w[1]]
@@ -550,12 +558,30 @@ class TestOverLengthPaths:
         assert len(str(path)) > scanner.MAX_PATH_LENGTH
         return path
 
+    def _at_length(self, library, total):
+        """A real file whose full path is exactly `total` characters.
+
+        Nested until the remaining budget fits inside one path component,
+        since filesystems cap a single name at 255 bytes.
+        """
+        deep = library
+        while total - len(str(deep)) - 1 - len('.mp3') > 200:
+            deep = deep / ('d' * 100)
+        deep.mkdir(parents=True, exist_ok=True)
+        stem = 'n' * (total - len(str(deep)) - 1 - len('.mp3'))
+        assert stem, "no budget left for a filename; tmp base path too long"
+        path = deep / (stem + '.mp3')
+        path.write_bytes(b'audio bytes')
+        assert len(str(path)) == total
+        return path
+
     def test_a_path_longer_than_the_column_is_skipped(self, library, fake_db):
         self._too_long(library)
 
         counts = scanner.scan_music()
 
         assert counts['skipped'] == 1
+        assert counts['skipped_too_long'] == 1
         assert counts['added'] == 0
         assert [w for w in fake_db['writes'] if w[0] == 'insert'] == []
 
@@ -595,3 +621,24 @@ class TestOverLengthPaths:
 
         assert 'MUSIC_DIR' in str(err.value)
         assert 'mounted' not in str(err.value).lower()
+
+    def test_a_path_exactly_at_the_limit_is_indexed(self, library, fake_db):
+        """The check is `> MAX_PATH_LENGTH`, not `>=`: 768 characters fit.
+
+        768 utf8mb4 characters is exactly the widest full unique index InnoDB
+        allows (3072 bytes / 4), so the guard and the column agree precisely.
+        """
+        self._at_length(library, scanner.MAX_PATH_LENGTH)
+
+        counts = scanner.scan_music()
+
+        assert counts['added'] == 1
+        assert counts['skipped'] == 0
+
+    def test_one_character_past_the_limit_is_skipped(self, library, fake_db):
+        self._at_length(library, scanner.MAX_PATH_LENGTH + 1)
+
+        counts = scanner.scan_music()
+
+        assert counts['added'] == 0
+        assert counts['skipped_too_long'] == 1

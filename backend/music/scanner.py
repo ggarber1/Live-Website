@@ -90,6 +90,16 @@ def _update_track(track_id, path, tags, stat):
     ))
 
 
+def _skip(counts, reason):
+    """Record a skipped file under both the rollup and its specific reason.
+
+    The three reasons need three different fixes — rename the file, repair
+    permissions, correct the tag data — so a single total is not actionable.
+    """
+    counts['skipped'] += 1
+    counts[f'skipped_{reason}'] += 1
+
+
 def _refuse_mass_removal(root, stale, indexed, found_any):
     """Raise ScanAborted if deleting `stale` would gut the table.
 
@@ -141,14 +151,16 @@ def scan_music(force_removals=False):
     a rebuildable index and a re-run finishes the job, so this is coherent —
     but a listing will show stale rows alongside the new ones until then.
 
-    Returns counts of added, updated, unchanged, removed, skipped and
+    Returns counts of added, updated, unchanged, removed, skipped (a rollup),
+    skipped_too_long, skipped_unreadable, skipped_rejected and
     unreadable_dirs.
     """
     root = music_dir()
     unreadable = []
     indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
-    counts = {'added': 0, 'updated': 0, 'unchanged': 0,
-              'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+    counts = {'added': 0, 'updated': 0, 'unchanged': 0, 'removed': 0,
+              'skipped': 0, 'skipped_too_long': 0, 'skipped_unreadable': 0,
+              'skipped_rejected': 0, 'unreadable_dirs': 0}
     seen = set()
     found_any = False
 
@@ -165,13 +177,13 @@ def scan_music(force_removals=False):
             logger.error(
                 "skipping path longer than %d characters (track.path cannot "
                 "store it intact): %s", MAX_PATH_LENGTH, path)
-            counts['skipped'] += 1
+            _skip(counts, 'too_long')
             continue
         try:
             stat = os.stat(path)
         except OSError as err:
             logger.error("skipping unreadable file %s: %s", path, err)
-            counts['skipped'] += 1
+            _skip(counts, 'unreadable')
             continue
 
         row = indexed.get(path)
@@ -193,7 +205,7 @@ def scan_music(force_removals=False):
             # A bad row; the next may be fine. A lost connection is
             # OperationalError/InterfaceError and deliberately propagates.
             logger.error("skipping %s, write rejected: %s", path, err)
-            counts['skipped'] += 1
+            _skip(counts, 'rejected')
             continue
 
     counts['unreadable_dirs'] = len(unreadable)
