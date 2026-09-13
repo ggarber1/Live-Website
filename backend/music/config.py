@@ -17,6 +17,12 @@ def music_dir():
             "missing environment variable: MUSIC_DIR. "
             "Copy backend/.env.example to backend/.env and fill it in."
         )
+    if not os.path.isabs(value):
+        raise RuntimeError(
+            f"MUSIC_DIR must be an absolute path, got {value!r}. "
+            "A relative path resolves against the process's working directory, "
+            "which differs between the CLI and systemd."
+        )
     return os.path.realpath(value)
 
 
@@ -28,6 +34,8 @@ def resolve_inside_music_dir(path):
     into an arbitrary-file read. Comparison is against root + separator so that
     /music does not appear to contain /music-backup.
     """
+    if not path:
+        return None
     root = music_dir()
     resolved = os.path.realpath(path)
     if resolved != root and not resolved.startswith(root + os.sep):

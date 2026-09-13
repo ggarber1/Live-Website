@@ -30,6 +30,15 @@ class TestMusicDir:
 
         assert os.path.isabs(music_dir())
 
+    def test_relative_path_is_rejected(self, monkeypatch):
+        """A relative value would resolve against an unpredictable cwd."""
+        monkeypatch.setenv('MUSIC_DIR', 'media/music')
+
+        with pytest.raises(RuntimeError) as err:
+            music_dir()
+
+        assert 'absolute' in str(err.value)
+
 
 class TestResolveInsideMusicDir:
     def test_accepts_a_file_inside_the_root(self, monkeypatch, tmp_path):
@@ -75,6 +84,17 @@ class TestResolveInsideMusicDir:
         monkeypatch.setenv('MUSIC_DIR', str(tmp_path / 'music'))
 
         assert resolve_inside_music_dir(str(sibling / 'song.mp3')) is None
+
+    def test_rejects_an_empty_path(self, monkeypatch, tmp_path):
+        """realpath('') is the cwd, which must not be treated as contained."""
+        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
+
+        assert resolve_inside_music_dir('') is None
+
+    def test_accepts_the_root_itself(self, monkeypatch, tmp_path):
+        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
+
+        assert resolve_inside_music_dir(str(tmp_path)) == os.path.realpath(str(tmp_path))
 
 
 def test_max_path_length_matches_the_column():
