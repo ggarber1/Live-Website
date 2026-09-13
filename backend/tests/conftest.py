@@ -2,11 +2,13 @@ import pytest
 
 import blog.blog
 import habits.habits
+import music.music
 import recipes.recipes
 import todo.todo
 from app import app as flask_app
 
-SERVICE_MODULES = (blog.blog, habits.habits, recipes.recipes, todo.todo)
+SERVICE_MODULES = (blog.blog, habits.habits, music.music,
+                   recipes.recipes, todo.todo)
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +23,7 @@ def db_env(monkeypatch):
     monkeypatch.setenv('DB_NAME', 'test_db')
     monkeypatch.delenv('DB_HOST', raising=False)
     monkeypatch.delenv('DB_PORT', raising=False)
+    monkeypatch.setenv('MUSIC_DIR', '/tmp/livs-test-music')
 
 
 class FakeWrites:
@@ -50,8 +53,9 @@ def writes(monkeypatch):
         return fake.new_id
 
     for module in SERVICE_MODULES:
-        monkeypatch.setattr(module, 'execute', fake_execute)
-        monkeypatch.setattr(module, 'insert', fake_insert)
+        # Only some service modules write. music imports just fetch_all/fetch_one.
+        monkeypatch.setattr(module, 'execute', fake_execute, raising=False)
+        monkeypatch.setattr(module, 'insert', fake_insert, raising=False)
     return fake
 
 

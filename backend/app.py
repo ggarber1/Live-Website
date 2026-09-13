@@ -11,6 +11,7 @@ load_dotenv()
 from blog.blog import bp as blog_bp
 from database import db
 from habits.habits import bp as habits_bp
+from music.music import bp as music_bp
 from music.scanner import scan_music_command
 from recipes.recipes import bp as recipes_bp
 from todo.todo import bp as todo_bp
@@ -37,6 +38,7 @@ app.cli.add_command(scan_music_command)
 
 app.register_blueprint(blog_bp)
 app.register_blueprint(habits_bp)
+app.register_blueprint(music_bp)
 app.register_blueprint(recipes_bp)
 app.register_blueprint(todo_bp)
 
