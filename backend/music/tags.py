@@ -79,7 +79,9 @@ def read_tags(path):
         if length is not None and 0 < length <= MAX_SIGNED_INT:
             duration = int(length)
 
-    # A long filename can overflow the column just as a long tag can.
+    # Filesystems cap a single name at 255 bytes, so today this cannot actually
+    # truncate. It is here so the fallback still honours MAX_TEXT_LENGTH if that
+    # ever drops below 255 because the column narrowed.
     fallback = os.path.splitext(os.path.basename(path))[0][:MAX_TEXT_LENGTH]
 
     return {

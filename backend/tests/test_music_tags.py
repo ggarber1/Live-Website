@@ -68,12 +68,14 @@ def test_audio_extensions_are_lowercase_with_dots():
         assert ext == ext.lower()
 
 
-def test_a_long_filename_fallback_is_truncated(tmp_path):
-    """With no tags the filename becomes the title, and it can be too long.
+def test_the_filename_fallback_honours_the_text_limit(tmp_path):
+    """The fallback title is clamped like a tag value is.
 
-    The path is never written to disk: most filesystems (including this
-    one) reject a 400-character filename outright, but the fallback is pure
-    string manipulation and read_tags already tolerates a missing file.
+    No filesystem permits a basename this long (NAME_MAX is 255 bytes), so the
+    clamp cannot fire on real input today. It is here to keep the fallback
+    consistent with MAX_TEXT_LENGTH should that drop below 255 because the
+    column narrowed — which test_track_text_columns_match_the_tag_truncation
+    would then require. The path is deliberately not written to disk.
     """
     path = tmp_path / ('n' * 400 + '.mp3')
 
