@@ -104,7 +104,7 @@ def _refuse_mass_removal(root, stale, indexed, found_any):
         raise ScanAborted(
             f"found no audio files under {root} but track holds "
             f"{len(indexed)} rows; refusing to delete them. "
-            "Is the drive mounted?"
+            "Is the drive mounted? Pass force_removals to proceed anyway."
         )
     if len(indexed) < REMOVAL_FLOOR:
         return
@@ -113,8 +113,8 @@ def _refuse_mass_removal(root, stale, indexed, found_any):
         raise ScanAborted(
             f"scan would remove {len(stale)} of {len(indexed)} rows "
             f"({share:.0%}) under {root}; refusing. Did MUSIC_DIR change, or "
-            "the drive remount under a different path? Pass force_removals "
-            "to proceed."
+            "did the drive remount under a different path? Pass "
+            "force_removals to proceed anyway."
         )
 
 
@@ -134,6 +134,12 @@ def scan_music(force_removals=False):
     share of the table is refused (see `_refuse_mass_removal`) unless
     `force_removals` is set, since an unmounted drive or a reconfigured
     MUSIC_DIR looks identical to a genuinely emptied library.
+
+    That refusal is not atomic with respect to the writes already made in the
+    same call: each statement commits on its own, so an aborted scan leaves
+    the adds and updates in place and only the removals undone. The table is
+    a rebuildable index and a re-run finishes the job, so this is coherent —
+    but a listing will show stale rows alongside the new ones until then.
 
     Returns counts of added, updated, unchanged, removed, skipped and
     unreadable_dirs.

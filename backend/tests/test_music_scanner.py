@@ -470,6 +470,41 @@ class TestRemovalAbortRail:
 
         assert scanner.scan_music()['removed'] == 2
 
+    def _rows_for(self, library, present, stale):
+        """`present` files on disk plus `stale` rows with no file behind them."""
+        rows = []
+        for i in range(present):
+            path = write_audio(library, f'{i}.mp3')
+            rows.append({'id': i, 'path': str(path),
+                         'size_bytes': path.stat().st_size,
+                         'mtime_ns': path.stat().st_mtime_ns})
+        rows += [{'id': 500 + i, 'path': str(library / f'gone{i}.mp3'),
+                  'size_bytes': 1, 'mtime_ns': 1} for i in range(stale)]
+        return rows
+
+    def test_exactly_the_limit_proceeds(self, library, fake_db):
+        """The check is `> REMOVAL_LIMIT`, not `>=`: half is still allowed.
+
+        Ten rows, so REMOVAL_FLOOR does not exempt this — the limit is what
+        is being pinned, not the floor.
+        """
+        fake_db['rows'] = self._rows_for(library, present=5, stale=5)
+
+        assert scanner.scan_music()['removed'] == 5
+
+    def test_one_row_past_the_limit_aborts(self, library, fake_db):
+        fake_db['rows'] = self._rows_for(library, present=4, stale=6)
+
+        with pytest.raises(scanner.ScanAborted):
+            scanner.scan_music()
+
+    def test_just_below_the_floor_is_exempt(self, library, fake_db):
+        """Nine rows, eight of them stale — far past the limit, under the
+        floor, so it proceeds. Pins `< REMOVAL_FLOOR` rather than `<=`."""
+        fake_db['rows'] = self._rows_for(library, present=1, stale=8)
+
+        assert scanner.scan_music()['removed'] == 8
+
     @pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
     def test_an_unreadable_directory_still_defers_quietly(self, library, fake_db):
         """Distinct from the abort rail: an incomplete walk is known-incomplete,
