@@ -23,11 +23,19 @@ def test_list_returns_tracks_with_pagination_envelope(client, reads):
 
 
 def test_list_envelope_is_an_object_not_a_bare_array(client, reads):
-    """Unlike the other services: a library is too big to return whole."""
+    """Unlike the other services: a library is too big to return whole.
+
+    Asserts the exact key set, not merely `isinstance(dict)` — an error body
+    like {"error": ...} is also a dict, so the looser check passed against a
+    404 while the route did not yet exist.
+    """
     reads.rows = []
     reads.row = {'n': 0}
 
-    assert isinstance(client.get('/music/tracks').get_json(), dict)
+    res = client.get('/music/tracks')
+
+    assert res.status_code == 200
+    assert set(res.get_json()) == {'tracks', 'total', 'limit', 'offset'}
 
 
 def test_list_runs_a_count_and_a_page_query(client, reads):
