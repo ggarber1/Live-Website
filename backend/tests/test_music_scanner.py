@@ -213,3 +213,130 @@ def test_an_unreadable_directory_is_counted(library, fake_db):
 
     assert counts['unreadable_dirs'] == 1
     assert counts['added'] == 1
+
+
+class TestScanIsIncremental:
+    def test_unchanged_file_is_not_rewritten(self, library, fake_db, monkeypatch):
+        path = write_audio(library, 'song.mp3')
+        stat = path.stat()
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path),
+            'size_bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns,
+        }]
+
+        read_calls = []
+        monkeypatch.setattr(scanner, 'read_tags',
+                            lambda p: read_calls.append(p) or {
+                                'title': None, 'artist': None, 'album': None,
+                                'track_no': None, 'duration_seconds': None})
+
+        counts = scanner.scan_music()
+
+        assert counts == {'added': 0, 'updated': 0, 'unchanged': 1,
+                          'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+        assert read_calls == [], "tags must not be re-read for unchanged files"
+        assert [w for w in fake_db['writes'] if w[0] in ('insert', 'execute')] == []
+
+    def test_changed_mtime_updates_in_place(self, library, fake_db):
+        path = write_audio(library, 'song.mp3')
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path),
+            'size_bytes': path.stat().st_size, 'mtime_ns': 1,
+        }]
+
+        counts = scanner.scan_music()
+
+        assert counts['updated'] == 1
+        assert counts['added'] == 0
+        kinds = [w[0] for w in fake_db['writes']]
+        assert 'insert' not in kinds, "must UPDATE, not delete-and-reinsert"
+        _, query, params = next(w for w in fake_db['writes'] if w[0] == 'execute')
+        assert query.strip().startswith('UPDATE track')
+        assert 7 in params
+
+    def test_changed_size_updates_in_place(self, library, fake_db):
+        path = write_audio(library, 'song.mp3')
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path),
+            'size_bytes': 999999, 'mtime_ns': path.stat().st_mtime_ns,
+        }]
+
+        assert scanner.scan_music()['updated'] == 1
+
+    def test_an_update_keeps_the_existing_id(self, library, fake_db):
+        """Playlists will reference track.id; re-tagging must not renumber."""
+        path = write_audio(library, 'song.mp3')
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path), 'size_bytes': 1, 'mtime_ns': 1,
+        }]
+
+        scanner.scan_music()
+
+        _, _, params = next(w for w in fake_db['writes'] if w[0] == 'execute')
+        assert params[-1] == 7, "the id must be the WHERE target, unchanged"
+
+    def test_a_rejected_update_skips_only_that_file(self, library, fake_db, monkeypatch):
+        import mariadb
+
+        path = write_audio(library, 'song.mp3')
+        fake_db['rows'] = [{
+            'id': 7, 'path': str(path), 'size_bytes': 1, 'mtime_ns': 1,
+        }]
+
+        def rejecting_execute(query, params=None):
+            fake_db['writes'].append(('execute', query, params))
+            raise mariadb.DataError('out of range')
+
+        monkeypatch.setattr(scanner, 'execute', rejecting_execute)
+
+        counts = scanner.scan_music()
+
+        assert counts['updated'] == 0
+        assert counts['skipped'] == 1
+
+
+class TestScanRemoves:
+    def test_row_whose_file_is_gone_is_deleted(self, library, fake_db):
+        kept = write_audio(library, 'kept.mp3')
+        fake_db['rows'] = [
+            {'id': 1, 'path': str(kept), 'size_bytes': kept.stat().st_size,
+             'mtime_ns': kept.stat().st_mtime_ns},
+            {'id': 2, 'path': str(library / 'gone.mp3'),
+             'size_bytes': 10, 'mtime_ns': 10},
+        ]
+
+        counts = scanner.scan_music()
+
+        assert counts['removed'] == 1
+        assert counts['unchanged'] == 1
+        deletes = [w for w in fake_db['writes']
+                   if w[0] == 'execute' and 'DELETE' in w[1]]
+        assert len(deletes) == 1
+        assert deletes[0][2] == (2,)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
+def test_removal_is_skipped_after_an_incomplete_walk(library, fake_db):
+    """An unreadable directory hides its files, which is indistinguishable
+    from them being deleted. Removing those rows would be silent data loss."""
+    locked = library / 'Locked'
+    locked.mkdir()
+    hidden = locked / 'hidden.mp3'
+    hidden.write_bytes(b'audio bytes')
+    kept = write_audio(library, 'ok.mp3')
+    fake_db['rows'] = [
+        {'id': 1, 'path': str(kept), 'size_bytes': kept.stat().st_size,
+         'mtime_ns': kept.stat().st_mtime_ns},
+        {'id': 2, 'path': str(hidden), 'size_bytes': 11, 'mtime_ns': 1},
+    ]
+    os.chmod(locked, 0o000)
+    try:
+        counts = scanner.scan_music()
+    finally:
+        os.chmod(locked, 0o755)
+
+    assert counts['unreadable_dirs'] == 1
+    assert counts['removed'] == 0
+    deletes = [w for w in fake_db['writes']
+               if w[0] == 'execute' and 'DELETE' in w[1]]
+    assert deletes == [], "must not delete rows it could not verify"

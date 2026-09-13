@@ -16,6 +16,15 @@ INSERT INTO track
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
+UPDATE_TRACK = """
+UPDATE track
+   SET path = ?, title = ?, artist = ?, album = ?, track_no = ?,
+       duration_seconds = ?, format = ?, size_bytes = ?, mtime_ns = ?
+ WHERE id = ?
+"""
+
+SELECT_INDEXED = "SELECT id, path, size_bytes, mtime_ns FROM track"
+
 
 def find_audio_files(root, on_error=None):
     """Yield every audio file under `root`, sorted within each directory.
@@ -59,16 +68,35 @@ def _insert_track(path, tags, stat):
     ))
 
 
+def _update_track(track_id, path, tags, stat):
+    execute(UPDATE_TRACK, (
+        path, tags['title'], tags['artist'], tags['album'],
+        tags['track_no'], tags['duration_seconds'],
+        _file_format(path), stat.st_size, stat.st_mtime_ns, track_id,
+    ))
+
+
 def scan_music():
     """Index MUSIC_DIR into the track table.
+
+    Incremental: a file whose size and mtime_ns match the indexed row is
+    skipped without re-reading its tags, so rescanning a large library is
+    cheap. Existing rows are updated in place rather than deleted and
+    reinserted, so ids stay stable for future playlist references.
+
+    Removal only runs when the walk was complete. An unreadable directory
+    makes its files invisible, which looks exactly like them being deleted,
+    and dropping those rows would be silent data loss.
 
     Returns counts of added, updated, unchanged, removed, skipped and
     unreadable_dirs.
     """
     root = music_dir()
     unreadable = []
+    indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
     counts = {'added': 0, 'updated': 0, 'unchanged': 0,
               'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+    seen = set()
 
     for path in find_audio_files(root, on_error=unreadable.append):
         try:
@@ -77,19 +105,43 @@ def scan_music():
             logger.error("skipping unreadable file %s: %s", path, err)
             counts['skipped'] += 1
             continue
+
+        # Recorded before the write is attempted: a file that exists but could
+        # not be written must not then have its row deleted below.
+        seen.add(path)
+        row = indexed.get(path)
+        if (row is not None
+                and row['size_bytes'] == stat.st_size
+                and row['mtime_ns'] == stat.st_mtime_ns):
+            counts['unchanged'] += 1
+            continue
+
+        tags = read_tags(path)
         try:
-            _insert_track(path, read_tags(path), stat)
+            if row is None:
+                _insert_track(path, tags, stat)
+                counts['added'] += 1
+            else:
+                _update_track(row['id'], path, tags, stat)
+                counts['updated'] += 1
         except (mariadb.IntegrityError, mariadb.DataError) as err:
-            # This row is bad; the next one may be fine. A lost connection is
-            # OperationalError/InterfaceError and deliberately propagates: the
-            # connection is cached for the whole app context, so every
-            # remaining file would pay for a full tag read before failing and
-            # then be reported as merely "skipped", hiding a dead database
-            # behind thousands of per-file entries.
-            logger.error("skipping %s, insert rejected: %s", path, err)
+            # A bad row; the next may be fine. A lost connection is
+            # OperationalError/InterfaceError and deliberately propagates.
+            logger.error("skipping %s, write rejected: %s", path, err)
             counts['skipped'] += 1
             continue
-        counts['added'] += 1
 
     counts['unreadable_dirs'] = len(unreadable)
+
+    if unreadable:
+        logger.error(
+            "%d directories could not be read; skipping removal detection so "
+            "rows for files beneath them are not deleted", len(unreadable))
+        return counts
+
+    for path, row in indexed.items():
+        if path not in seen:
+            execute("DELETE FROM track WHERE id = ?", (row['id'],))
+            counts['removed'] += 1
+
     return counts
