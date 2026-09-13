@@ -79,8 +79,14 @@ def scan_music():
             continue
         try:
             _insert_track(path, read_tags(path), stat)
-        except mariadb.Error as err:
-            logger.error("skipping %s, insert failed: %s", path, err)
+        except (mariadb.IntegrityError, mariadb.DataError) as err:
+            # This row is bad; the next one may be fine. A lost connection is
+            # OperationalError/InterfaceError and deliberately propagates: the
+            # connection is cached for the whole app context, so every
+            # remaining file would pay for a full tag read before failing and
+            # then be reported as merely "skipped", hiding a dead database
+            # behind thousands of per-file entries.
+            logger.error("skipping %s, insert rejected: %s", path, err)
             counts['skipped'] += 1
             continue
         counts['added'] += 1

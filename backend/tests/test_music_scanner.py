@@ -144,7 +144,7 @@ class TestScanAddsFiles:
         assert counts['added'] == 1
         assert counts['skipped'] == 1
 
-    def test_a_failed_insert_skips_only_that_file(self, library, fake_db, monkeypatch):
+    def test_a_rejected_row_skips_only_that_file(self, library, fake_db, monkeypatch):
         """One bad row must not abandon the rest of a large scan."""
         import mariadb
 
@@ -156,7 +156,8 @@ class TestScanAddsFiles:
         def flaky_insert(query, params=None):
             attempts.append(params)
             if len(attempts) == 2:
-                raise mariadb.Error('duplicate key')
+                # What a duplicate path or an out-of-range value actually is.
+                raise mariadb.IntegrityError('duplicate key')
             return len(attempts)
 
         monkeypatch.setattr(scanner, 'insert', flaky_insert)
@@ -166,6 +167,33 @@ class TestScanAddsFiles:
         assert counts['added'] == 2
         assert counts['skipped'] == 1
         assert len(attempts) == 3, "the scan must continue past the failure"
+
+    def test_a_lost_connection_aborts_instead_of_skipping_everything(
+            self, library, fake_db, monkeypatch):
+        """A dead connection is systemic, not a bad row.
+
+        The connection is cached for the whole app context, so swallowing this
+        per file would make every remaining file pay for a tag read and then be
+        reported as merely skipped — hiding a dead database behind thousands of
+        per-file entries.
+        """
+        import mariadb
+
+        for name in ('a.mp3', 'b.mp3', 'c.mp3'):
+            write_audio(library, name)
+
+        attempts = []
+
+        def dead_insert(query, params=None):
+            attempts.append(params)
+            raise mariadb.OperationalError('server has gone away')
+
+        monkeypatch.setattr(scanner, 'insert', dead_insert)
+
+        with pytest.raises(mariadb.OperationalError):
+            scanner.scan_music()
+
+        assert len(attempts) == 1, "must give up, not try every remaining file"
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
