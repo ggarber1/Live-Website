@@ -5,11 +5,13 @@ import mutagen
 
 AUDIO_EXTENSIONS = ('.mp3', '.flac', '.m4a', '.ogg', '.wav')
 
-# track_no and duration_seconds are INT columns. Tags hold arbitrary garbage,
-# and MySQL in strict mode rejects an out-of-range value outright — which would
-# abort an entire scan over a single mistagged file.
+# track_no and duration_seconds are INT columns, and title/artist/album are
+# VARCHAR(255). Tags hold arbitrary garbage, and MySQL in strict mode rejects
+# an out-of-range or over-length value outright — which would abort an entire
+# scan over a single mistagged file.
 MAX_SIGNED_INT = 2147483647
 MAX_TRACK_NUMBER = 9999
+MAX_TEXT_LENGTH = 255
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +36,18 @@ def track_number(raw):
 
 
 def _first(audio, key):
-    """Easy-mode tags are lists; take the first non-empty value."""
+    """Easy-mode tags are lists; take the first non-empty value.
+
+    Truncated to MAX_TEXT_LENGTH because the columns are VARCHAR(255) and a
+    longer value fails the insert under strict mode, taking the rest of the
+    scan with it. Truncating keeps a usable, searchable value where rejecting
+    would lose the field entirely.
+    """
     values = audio.get(key) or []
     for value in values:
-        if value and str(value).strip():
-            return str(value).strip()
+        text = str(value).strip()
+        if text:
+            return text[:MAX_TEXT_LENGTH]
     return None
 
 
@@ -70,8 +79,11 @@ def read_tags(path):
         if length is not None and 0 < length <= MAX_SIGNED_INT:
             duration = int(length)
 
+    # A long filename can overflow the column just as a long tag can.
+    fallback = os.path.splitext(os.path.basename(path))[0][:MAX_TEXT_LENGTH]
+
     return {
-        'title': title or os.path.splitext(os.path.basename(path))[0],
+        'title': title or fallback,
         'artist': artist,
         'album': album,
         'track_no': number,

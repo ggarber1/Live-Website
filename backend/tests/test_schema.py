@@ -156,3 +156,24 @@ def test_max_path_length_matches_the_track_path_column():
 
     assert re.search(rf'^\s*path\s+VARCHAR\({MAX_PATH_LENGTH}\)',
                      TABLE_DDL['track'], re.M)
+
+
+def test_track_int_columns_can_hold_the_tag_bounds():
+    """tags.py clamps to these; a narrowed column must narrow the clamp too."""
+    from music.tags import MAX_SIGNED_INT, MAX_TRACK_NUMBER
+
+    ddl = TABLE_DDL['track']
+    for column in ('track_no', 'duration_seconds'):
+        assert re.search(rf'^\s*{column}\s+INT\b', ddl, re.M), column
+    assert MAX_SIGNED_INT == 2147483647
+    assert MAX_TRACK_NUMBER <= MAX_SIGNED_INT
+
+
+def test_track_text_columns_match_the_tag_truncation():
+    """tags.py truncates to MAX_TEXT_LENGTH; the columns must be that wide."""
+    from music.tags import MAX_TEXT_LENGTH
+
+    ddl = TABLE_DDL['track']
+    for column in ('title', 'artist', 'album'):
+        assert re.search(rf'^\s*{column}\s+VARCHAR\({MAX_TEXT_LENGTH}\)',
+                         ddl, re.M), column

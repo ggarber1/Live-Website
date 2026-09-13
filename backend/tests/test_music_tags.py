@@ -68,6 +68,18 @@ def test_audio_extensions_are_lowercase_with_dots():
         assert ext == ext.lower()
 
 
+def test_a_long_filename_fallback_is_truncated(tmp_path):
+    """With no tags the filename becomes the title, and it can be too long.
+
+    The path is never written to disk: most filesystems (including this
+    one) reject a 400-character filename outright, but the fallback is pure
+    string manipulation and read_tags already tolerates a missing file.
+    """
+    path = tmp_path / ('n' * 400 + '.mp3')
+
+    assert len(read_tags(str(path))['title']) == 255
+
+
 def test_valid_file_with_no_tag_block(tmp_path):
     """Distinct from an unparseable file: mutagen succeeds, .tags is None.
 
@@ -170,3 +182,23 @@ class TestReadTagsExtraction:
         tagged({'title': ['x']}, length=1e12)
 
         assert read_tags(str(tmp_path / 'x.mp3'))['duration_seconds'] is None
+
+    def test_over_length_tags_are_truncated(self, tagged, tmp_path):
+        """VARCHAR(255) columns; a longer value fails the insert outright."""
+        tagged({
+            'title': ['T' * 500],
+            'artist': ['A' * 500],
+            'album': ['B' * 500],
+        })
+
+        tags = read_tags(str(tmp_path / 'x.mp3'))
+
+        assert len(tags['title']) == 255
+        assert len(tags['artist']) == 255
+        assert len(tags['album']) == 255
+        assert tags['title'] == 'T' * 255
+
+    def test_a_tag_at_the_limit_is_untouched(self, tagged, tmp_path):
+        tagged({'title': ['T' * 255]})
+
+        assert read_tags(str(tmp_path / 'x.mp3'))['title'] == 'T' * 255
