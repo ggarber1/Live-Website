@@ -152,6 +152,8 @@ TABLE_DDL = {
     # no slack. On a server defaulting to ROW_FORMAT=COMPACT (767-byte cap)
     # create_tables() fails loudly with an index-too-long error rather than
     # silently truncating, which is the failure mode we want.
+    # mtime_ns is st_mtime_ns: whole seconds would treat a file re-tagged twice
+    # inside one second as unchanged.
     'track': """
     CREATE TABLE IF NOT EXISTS track (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -163,7 +165,7 @@ TABLE_DDL = {
         duration_seconds INT,
         format VARCHAR(16) NOT NULL,
         size_bytes BIGINT NOT NULL,
-        mtime BIGINT NOT NULL,
+        mtime_ns BIGINT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,

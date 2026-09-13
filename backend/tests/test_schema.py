@@ -98,7 +98,7 @@ def test_track_table_exists_with_the_columns_the_scanner_needs():
     columns = ddl_columns(TABLE_DDL['track'])
 
     assert {'id', 'path', 'title', 'artist', 'album', 'track_no',
-            'duration_seconds', 'format', 'size_bytes', 'mtime',
+            'duration_seconds', 'format', 'size_bytes', 'mtime_ns',
             'created_at'} <= columns
 
 

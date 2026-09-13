@@ -106,20 +106,82 @@ class TestScanAddsFiles:
         inserts = [w for w in fake_db['writes'] if w[0] == 'insert']
         assert len(inserts) == 2
 
-    def test_insert_carries_path_format_size_and_mtime(self, library, fake_db):
+    def test_insert_carries_every_column_in_order(self, library, fake_db):
+        """Positional, not membership: a transposition must fail this."""
         path = write_audio(library, 'song.mp3')
+        stat = path.stat()
 
         scanner.scan_music()
 
         _, query, params = next(w for w in fake_db['writes'] if w[0] == 'insert')
         assert 'INSERT INTO track' in query
-        assert str(path) in params
-        assert 'mp3' in params
-        assert path.stat().st_size in params
-        assert int(path.stat().st_mtime) in params
+        assert params == (
+            str(path), 'song', None, None, None, None,
+            'mp3', stat.st_size, stat.st_mtime_ns,
+        )
 
     def test_empty_library_and_empty_table_is_not_an_error(self, library, fake_db):
         counts = scanner.scan_music()
 
         assert counts == {'added': 0, 'updated': 0, 'unchanged': 0,
-                          'removed': 0, 'skipped': 0}
+                          'removed': 0, 'skipped': 0, 'unreadable_dirs': 0}
+
+    def test_an_unreadable_file_is_skipped_not_fatal(self, library, fake_db, monkeypatch):
+        write_audio(library, 'ok.mp3')
+        write_audio(library, 'bad.mp3')
+
+        real_stat = os.stat
+
+        def failing_stat(target, *args, **kwargs):
+            if str(target).endswith('bad.mp3'):
+                raise OSError(13, 'Permission denied')
+            return real_stat(target, *args, **kwargs)
+
+        monkeypatch.setattr(scanner.os, 'stat', failing_stat)
+
+        counts = scanner.scan_music()
+
+        assert counts['added'] == 1
+        assert counts['skipped'] == 1
+
+    def test_a_failed_insert_skips_only_that_file(self, library, fake_db, monkeypatch):
+        """One bad row must not abandon the rest of a large scan."""
+        import mariadb
+
+        for name in ('a.mp3', 'b.mp3', 'c.mp3'):
+            write_audio(library, name)
+
+        attempts = []
+
+        def flaky_insert(query, params=None):
+            attempts.append(params)
+            if len(attempts) == 2:
+                raise mariadb.Error('duplicate key')
+            return len(attempts)
+
+        monkeypatch.setattr(scanner, 'insert', flaky_insert)
+
+        counts = scanner.scan_music()
+
+        assert counts['added'] == 2
+        assert counts['skipped'] == 1
+        assert len(attempts) == 3, "the scan must continue past the failure"
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
+def test_an_unreadable_directory_is_counted(library, fake_db):
+    """os.walk hides scandir failures, which would make a partial library look
+    complete — and Task 5's removal detection would then delete the rows for
+    everything underneath it."""
+    locked = library / 'Locked'
+    locked.mkdir()
+    write_audio(library, 'Locked/hidden.mp3')
+    write_audio(library, 'ok.mp3')
+    os.chmod(locked, 0o000)
+    try:
+        counts = scanner.scan_music()
+    finally:
+        os.chmod(locked, 0o755)
+
+    assert counts['unreadable_dirs'] == 1
+    assert counts['added'] == 1
