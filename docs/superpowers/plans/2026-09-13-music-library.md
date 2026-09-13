@@ -22,11 +22,21 @@ Spec: `docs/superpowers/specs/2026-09-09-media-library-design.md`
 | 4 Scanner, add files | done | **No.** Amended: dotfile skip, `on_error`, per-file write guard |
 | 5 Incremental + removal | done | Section rewritten below; code is the source of truth |
 | 6 Removal abort rail | done | Section rewritten below; widened to proportional |
-| 7 Over-length paths | in progress | Placement instruction below is wrong — see note in that section |
-| 8 CLI command | not started | Unverified against the current scanner |
+| 7 Over-length paths | done | Section rewritten below; placement is the substance |
+| 8 CLI command | done | Section rewritten below; exit-code policy is the substance |
 | 9-11 Routes | not started | Believed accurate; independent of the scanner |
-| 12 Integration tests | not started | **Stale** — asserts a five-key counts dict; there are six |
-| 13 Manual verification | not started | **Stale** — expected CLI output predates `unreadable_dirs` |
+| 12 Integration tests | not started | **Stale** — asserts a five-key counts dict; there are nine |
+| 13 Manual verification | not started | **Stale** — expected CLI output predates the skip breakdown |
+
+**The scanner (Tasks 1-8) is complete.** `scan_music(force_removals=False)`
+returns nine counts — `added`, `updated`, `unchanged`, `removed`, `skipped`,
+`skipped_too_long`, `skipped_unreadable`, `skipped_rejected`,
+`unreadable_dirs` — and raises `ScanAborted` rather than gutting the table.
+It handles, each distinctly and each with a test that fails when the handling
+is removed: an empty library, an unmounted drive, a reconfigured root, an
+unreadable directory, an unreadable file, a malformed tag, an oversized
+numeric value, over-length text, an over-length path, a duplicate row, and a
+dropped connection.
 
 Roughly every safety property of the scanner came out of code review rather
 than this plan, so for Tasks 1-7 **`backend/music/` and its tests are the
@@ -781,209 +791,69 @@ destructive and a human should decide.
 
 ---
 
-### Task 7: Scanner — over-length paths
+### Task 7: Scanner — over-length paths — DONE, superseded
 
-**Files:**
-- Modify: `backend/music/scanner.py`
-- Test: `backend/tests/test_music_scanner.py`
+Implemented in `1955859`, `2ce1271`. Original text removed; it put the check in
+the wrong place and predates the counts split.
 
-MySQL outside strict mode truncates an over-length value, producing a stored path that cannot stream. Skip and log instead.
+`track.path` is `VARCHAR(768)`, which is exactly the widest full unique index
+InnoDB allows (3072 bytes / 4 bytes per utf8mb4 character). Paths longer than
+that are skipped and logged rather than truncated into something that can never
+stream. There is no character-versus-byte gap: the guard counts codepoints and
+the column counts characters, and at 768 those coincide even for all-emoji
+paths.
 
-- [ ] **Step 1: Write the failing tests**
+**Placement is the substance of this task.** The check sits after
+`found_any = True` and `seen.add(path)`, before `os.stat`:
 
-Append to `backend/tests/test_music_scanner.py`:
+- after `found_any`, because that flag means "the walk yielded a candidate",
+  not "something was indexed" — a library whose paths are all too long is not
+  an unmounted drive and must reach the proportional rail, not the
+  "Is the drive mounted?" abort;
+- after `seen.add`, because the file exists and nothing about it should look
+  deleted.
 
-```python
-class TestOverLengthPaths:
-    def test_path_longer_than_the_column_is_skipped(self, library, fake_db, caplog):
-        # Nested directories, since most filesystems cap a single name at 255.
-        deep = library
-        for _ in range(6):
-            deep = deep / ('d' * 150)
-        deep.mkdir(parents=True)
-        path = deep / 'song.mp3'
-        path.write_bytes(b'audio bytes')
-        assert len(str(path)) > scanner.MAX_PATH_LENGTH
-
-        counts = scanner.scan_music()
-
-        assert counts['skipped'] == 1
-        assert counts['added'] == 0
-        assert [w for w in fake_db['writes'] if w[0] == 'insert'] == []
-
-    def test_skipping_is_logged(self, library, fake_db, caplog):
-        deep = library
-        for _ in range(6):
-            deep = deep / ('d' * 150)
-        deep.mkdir(parents=True)
-        (deep / 'song.mp3').write_bytes(b'audio bytes')
-
-        with caplog.at_level('ERROR'):
-            scanner.scan_music()
-
-        assert any('longer than' in r.message or 'longer than' in r.getMessage()
-                   for r in caplog.records)
-
-    def test_a_long_path_does_not_stop_other_files(self, library, fake_db):
-        write_audio(library, 'fine.mp3')
-        deep = library
-        for _ in range(6):
-            deep = deep / ('d' * 150)
-        deep.mkdir(parents=True)
-        (deep / 'too-long.mp3').write_bytes(b'audio bytes')
-
-        counts = scanner.scan_music()
-
-        assert counts['added'] == 1
-        assert counts['skipped'] == 1
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q -k OverLength`
-Expected: FAIL — `assert 0 == 1` on `counts['skipped']`; the long file is inserted.
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/scanner.py`, inside the `for path in found:` loop, add as the
-first statements in the body — before the `os.stat` call:
-
-```python
-        if len(path) > MAX_PATH_LENGTH:
-            logger.error(
-                "skipping path longer than %d characters (track.path cannot "
-                "store it intact): %s", MAX_PATH_LENGTH, path)
-            counts['skipped'] += 1
-            continue
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q`
-Expected: PASS, 19 passed
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd backend
-git add music/scanner.py tests/test_music_scanner.py
-git commit -m "feat(music): skip paths too long for the column"
-```
+Review also split the `skipped` counter. It had collapsed three problems with
+three different remedies into one number: rename the file, repair permissions,
+correct the tag data. `skipped` remains as the rollup, with
+`skipped_too_long`, `skipped_unreadable` and `skipped_rejected` beneath it, so
+the nine-key counts dict is what `scan_music` now returns.
 
 ---
 
-### Task 8: The `scan-music` CLI command
+### Task 8: The `scan-music` CLI command — DONE, superseded
 
-**Files:**
-- Modify: `backend/music/scanner.py`
-- Modify: `backend/app.py`
-- Test: `backend/tests/test_music_scanner.py`
+Implemented in `1759511`, `e7c570d`, `53f4f15`, `b057d96`. Original text removed;
+it predates the nine-key dict and the force option.
 
-A full scan takes minutes and would pin a gunicorn worker, so it is never reachable over HTTP. This mirrors `init-db` in `database/db.py:159-164`.
+`scan_music_command` wraps `scan_music(force_removals=...)` and is registered in
+`app.py`. It is deliberately not reachable over HTTP: a full scan takes minutes
+and would pin a gunicorn worker.
 
-- [ ] **Step 1: Write the failing tests**
+The **exit-code policy** is the substance, and was not in the original plan:
 
-Append to `backend/tests/test_music_scanner.py`:
+| Outcome | Exit | Why |
+| --- | --- | --- |
+| `ScanAborted` | non-zero | The scan refused to act. |
+| `unreadable_dirs > 0` | non-zero, after printing counts | Removal detection was skipped, so the index is knowingly stale. An unreadable directory disables removal for the whole table, not just that subtree — cumulative, and it worsens. |
+| skipped files only | zero | A per-file data problem is not a scan failure. One permanently broken file must not fail a nightly timer forever. |
 
-```python
-class TestScanMusicCommand:
-    def test_command_is_registered(self):
-        from app import app as flask_app
+Counts print before the failure is raised, so the operator keeps the numbers.
 
-        assert 'scan-music' in flask_app.cli.commands
+Two things review corrected that are worth not re-introducing:
 
-    def test_command_runs_the_scan_and_reports_counts(self, monkeypatch):
-        from app import app as flask_app
+- The abort messages said "Pass force_removals" — the Python kwarg. From a
+  shell the flag is `--force-removals`. Fixed at the source in
+  `_refuse_mass_removal`, since `scan_music` has exactly one caller.
+- `assert 'Traceback' not in result.output` was vacuous: Click's `CliRunner`
+  catches exceptions, so no traceback ever reaches output either way. The test
+  asserts on `result.exception` instead.
 
-        monkeypatch.setattr(scanner, 'scan_music', lambda: {
-            'added': 3, 'updated': 2, 'unchanged': 10,
-            'removed': 1, 'skipped': 0,
-        })
-
-        result = flask_app.test_cli_runner().invoke(args=['scan-music'])
-
-        assert result.exit_code == 0, result.output
-        assert 'added 3' in result.output
-        assert 'removed 1' in result.output
-
-    def test_command_reports_an_abort_without_a_traceback(self, monkeypatch):
-        from app import app as flask_app
-
-        def boom():
-            raise scanner.ScanAborted('drive not mounted')
-
-        monkeypatch.setattr(scanner, 'scan_music', boom)
-
-        result = flask_app.test_cli_runner().invoke(args=['scan-music'])
-
-        assert result.exit_code != 0
-        assert 'drive not mounted' in result.output
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q -k Command`
-Expected: FAIL — `assert 'scan-music' in flask_app.cli.commands`
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/scanner.py`, add the imports at the top:
-
-```python
-import click
-from flask.cli import with_appcontext
-```
-
-and append at the end of the file:
-
-```python
-@click.command('scan-music')
-@with_appcontext
-def scan_music_command():
-    """Index MUSIC_DIR into the track table."""
-    try:
-        counts = scan_music()
-    except ScanAborted as err:
-        raise click.ClickException(str(err))
-    click.echo(
-        "added {added}, updated {updated}, unchanged {unchanged}, "
-        "removed {removed}, skipped {skipped}".format(**counts)
-    )
-```
-
-`click.ClickException` prints the message and exits non-zero without a traceback,
-which is the right shape for an operator running this from a timer.
-
-In `backend/app.py`, register it next to the blueprint imports. Add to the import
-block:
-
-```python
-from music.scanner import scan_music_command
-```
-
-and after `db.init_app(app)`:
-
-```python
-app.cli.add_command(scan_music_command)
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_scanner.py -q`
-Expected: PASS, 22 passed
-
-- [ ] **Step 5: Verify it appears in the real CLI**
-
-Run: `cd backend && ./venv/bin/flask --app app --help`
-Expected: `scan-music  Index MUSIC_DIR into the track table.` in the command list
-
-- [ ] **Step 6: Commit**
-
-```bash
-cd backend
-git add music/scanner.py app.py tests/test_music_scanner.py
-git commit -m "feat(music): add scan-music CLI command"
-```
+Operations live in `deploy/README.md` section 6, with `deploy/livs-scan.service`
+and `deploy/livs-scan.timer` for the nightly run. Note the documented
+convention that `MUSIC_DIR` points at a subdirectory, not a filesystem root: a
+root-owned `lost+found` would be permanently unreadable, and "fix the
+permissions" is not actionable advice for it.
 
 ---
 
