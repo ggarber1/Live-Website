@@ -21,7 +21,17 @@ SELECT_PAGE = (
 )
 COUNT_ALL = "SELECT COUNT(*) AS n FROM track {where}"
 
-SEARCH_WHERE = "WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?"
+# '!' rather than the default backslash: a backslash in an ESCAPE clause is
+# itself subject to sql_mode (NO_BACKSLASH_ESCAPES would make '\\' two
+# characters, which ESCAPE rejects). '!' needs no escaping in a string
+# literal under any mode, so this means the same thing on every server.
+LIKE_ESCAPE = '!'
+
+SEARCH_WHERE = (
+    "WHERE title LIKE ? ESCAPE '!' "
+    "OR artist LIKE ? ESCAPE '!' "
+    "OR album LIKE ? ESCAPE '!'"
+)
 
 
 def _positive_int(name, default):
@@ -49,12 +59,13 @@ def _like_term(term):
     """Wrap a search term for LIKE, escaping the wildcards it may contain.
 
     `%` and `_` are LIKE metacharacters. Filename-derived titles are full of
-    underscores, and an unescaped `%` matches the whole library. Backslash is
-    MySQL's default LIKE escape character, so it is doubled first.
+    underscores, and an unescaped `%` matches the whole library. The escape
+    character itself is escaped first, or the escapes introduced below would
+    themselves be escaped.
     """
-    escaped = (term.replace('\\', '\\\\')
-                   .replace('%', r'\%')
-                   .replace('_', r'\_'))
+    escaped = term
+    for char in (LIKE_ESCAPE, '%', '_'):
+        escaped = escaped.replace(char, LIKE_ESCAPE + char)
     return f"%{escaped}%"
 
 

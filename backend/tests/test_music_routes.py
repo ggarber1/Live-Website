@@ -145,7 +145,8 @@ class TestSearch:
         client.get('/music/tracks?q=beach')
 
         page, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
-        assert 'WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?' in page
+        assert ("WHERE title LIKE ? ESCAPE '!' OR artist LIKE ? ESCAPE '!' "
+                "OR album LIKE ? ESCAPE '!'") in page
         assert params[:3] == ('%beach%', '%beach%', '%beach%')
 
     def test_query_is_parameterised_not_interpolated(self, client, reads):
@@ -191,4 +192,25 @@ class TestSearch:
         client.get('/music/tracks?q=50%25_mix')
 
         _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
-        assert params[0] == r'%50\%\_mix%'
+        assert params[0] == '%50!%!_mix%'
+
+    def test_the_escape_character_is_itself_escaped(self, client, reads):
+        """Pins the replacement order: escaping % and _ first would then
+        double-escape the ! characters that escaping introduced."""
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=hey%21_you')
+
+        _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
+        assert params[0] == '%hey!!!_you%'
+
+    def test_a_backslash_is_no_longer_special(self, client, reads):
+        """With ESCAPE '!' stated, a backslash in a title is just a character."""
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=foo%5Cbar')
+
+        _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
+        assert params[0] == '%foo\\bar%'
