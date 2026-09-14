@@ -1,6 +1,9 @@
-from flask import Blueprint, abort, jsonify, request
+import os
+
+from flask import Blueprint, abort, jsonify, request, send_file
 
 from database.db import fetch_all, fetch_one
+from music.config import resolve_inside_music_dir
 
 bp = Blueprint('music', __name__)
 
@@ -101,3 +104,38 @@ def list_tracks():
     return jsonify({
         'tracks': rows, 'total': total, 'limit': limit, 'offset': offset,
     })
+
+
+@bp.route('/music/tracks/<int:track_id>', methods=['GET'])
+def get_track(track_id):
+    track = fetch_one(
+        f"SELECT {TRACK_COLUMNS} FROM track WHERE id = ? LIMIT 1", (track_id,))
+    if track is None:
+        abort(404, description=f"no track with id {track_id}")
+    return jsonify(track)
+
+
+@bp.route('/music/tracks/<int:track_id>/stream', methods=['GET'])
+def stream_track(track_id):
+    """Serve the audio file for a track, supporting range requests.
+
+    The client supplies an id, never a path — the path comes from the row.
+    The containment check is defence in depth: the scanner indexes whatever
+    is on disk, so a symlink planted in the library would otherwise make this
+    an arbitrary-file read. A refusal returns the same 404 as an unknown id,
+    so it does not confirm the row exists.
+    """
+    track = fetch_one("SELECT path FROM track WHERE id = ? LIMIT 1", (track_id,))
+    if track is None:
+        abort(404, description=f"no track with id {track_id}")
+
+    path = resolve_inside_music_dir(track['path'])
+    if path is None:
+        abort(404, description=f"no track with id {track_id}")
+    if not os.path.isfile(path):
+        abort(404, description=f"track {track_id} is indexed but missing on disk")
+
+    # conditional=True makes Flask honour Range and return 206, which is what
+    # lets an <audio> element seek. Phase 3 replaces this with X-Accel-Redirect
+    # so gunicorn workers are not held open for the length of a track.
+    return send_file(path, conditional=True)

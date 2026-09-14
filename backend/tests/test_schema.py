@@ -29,6 +29,9 @@ REQUESTS = [
     ('post', '/recipes', {'title': 't', 'ingredients': ['a'], 'instructions': ['b']}),
     ('put', '/recipes/1', {'title': 't', 'ingredients': ['a'], 'instructions': ['b']}),
     ('delete', '/recipes/1', None),
+    ('get', '/music/tracks', None),
+    ('get', '/music/tracks/1', None),
+    ('get', '/music/tracks/1/stream', None),
 ]
 
 # Every type used in TABLE_DDL has to be listed here, or its columns are
@@ -60,6 +63,9 @@ def referenced_columns(sql):
     # Anything assigned or compared: `SET streak = ?`, `WHERE id = ?`.
     columns |= set(re.findall(r'(\w+)\s*=', sql))
 
+    # `title LIKE ?` names a column just as much as `title = ?` does.
+    columns |= set(re.findall(r'(\w+)\s+LIKE\b', sql))
+
     order_by = re.search(r'ORDER BY (.+?)$', sql)
     if order_by:
         columns |= {term.strip().split()[0] for term in order_by.group(1).split(',')}
@@ -70,7 +76,8 @@ def referenced_columns(sql):
 @pytest.mark.parametrize('method,path,body', REQUESTS)
 def test_route_sql_matches_the_schema(client, writes, reads, method, path, body):
     # A row has to exist or routes that look one up bail before their write.
-    reads.row = {'id': 1, 'name': 'x', 'streak': 1, 'last_completed': None}
+    reads.row = {'id': 1, 'name': 'x', 'streak': 1, 'last_completed': None,
+                 'n': 0, 'path': '/tmp/livs-test-music/probe.mp3'}
     kwargs = {'json': body} if body is not None else {}
     getattr(client, method)(path, **kwargs)
 

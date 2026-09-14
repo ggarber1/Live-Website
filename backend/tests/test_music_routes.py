@@ -214,3 +214,170 @@ class TestSearch:
 
         _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert params[0] == '%foo\\bar%'
+
+
+class TestSingleTrack:
+    def test_returns_the_track(self, client, reads):
+        reads.row = TRACK_ROW
+
+        res = client.get('/music/tracks/1')
+
+        assert res.status_code == 200
+        assert res.get_json()['title'] == 'Space Song'
+
+    def test_unknown_id_is_a_404(self, client, reads):
+        reads.row = None
+
+        res = client.get('/music/tracks/999')
+
+        assert res.status_code == 404
+        assert 'no track with id 999' in res.get_json()['error']
+
+    def test_looks_up_by_bound_id(self, client, reads):
+        reads.row = TRACK_ROW
+
+        client.get('/music/tracks/1')
+
+        query, params = reads.queries[0]
+        assert params == (1,)
+
+    def test_does_not_expose_the_filesystem_path(self, client, reads):
+        """Same rule as the listing: paths are server-side only.
+
+        Asserted against the query text, since the stub returns a fixed row
+        whatever the SELECT asks for. Task 12 checks the real response.
+        """
+        reads.row = TRACK_ROW
+
+        client.get('/music/tracks/1')
+
+        query, _ = reads.queries[0]
+        selected = query.split('FROM')[0]
+        assert 'SELECT *' not in selected
+        assert 'path' not in selected
+
+
+class TestStreaming:
+    def _serve(self, tmp_path, monkeypatch, reads, payload=b'ID3audiodata',
+               name='song.mp3'):
+        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
+        song = tmp_path / name
+        song.write_bytes(payload)
+        reads.row = {**TRACK_ROW, 'path': str(song)}
+        return song
+
+    def test_serves_a_file_inside_the_music_root(self, client, reads,
+                                                 monkeypatch, tmp_path):
+        self._serve(tmp_path, monkeypatch, reads)
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.status_code == 200
+        assert res.get_data() == b'ID3audiodata'
+
+    def test_sets_an_audio_content_type(self, client, reads, monkeypatch,
+                                        tmp_path):
+        """An <audio> element needs a type it recognises."""
+        self._serve(tmp_path, monkeypatch, reads)
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.mimetype == 'audio/mpeg'
+
+    def test_advertises_range_support(self, client, reads, monkeypatch, tmp_path):
+        self._serve(tmp_path, monkeypatch, reads, payload=b'0123456789')
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.headers['Accept-Ranges'] == 'bytes'
+
+    def test_range_request_returns_partial_content(self, client, reads,
+                                                   monkeypatch, tmp_path):
+        """Seeking in an <audio> element depends on this."""
+        self._serve(tmp_path, monkeypatch, reads, payload=b'0123456789')
+
+        res = client.get('/music/tracks/1/stream',
+                         headers={'Range': 'bytes=2-5'})
+
+        assert res.status_code == 206
+        assert res.get_data() == b'2345'
+        assert res.headers['Content-Range'] == 'bytes 2-5/10'
+
+    def test_unknown_id_is_a_404(self, client, reads):
+        reads.row = None
+
+        assert client.get('/music/tracks/999/stream').status_code == 404
+
+    def test_path_outside_the_root_is_refused(self, client, reads,
+                                              monkeypatch, tmp_path):
+        """A row pointing outside MUSIC_DIR must not be served."""
+        root = tmp_path / 'music'
+        root.mkdir()
+        secret = tmp_path / 'secret.txt'
+        secret.write_bytes(b'password')
+        monkeypatch.setenv('MUSIC_DIR', str(root))
+        reads.row = {**TRACK_ROW, 'path': str(secret)}
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.status_code == 404
+        assert b'password' not in res.get_data()
+
+    def test_symlink_escaping_the_root_is_refused(self, client, reads,
+                                                  monkeypatch, tmp_path):
+        """The scanner indexes whatever is on disk, including planted links."""
+        root = tmp_path / 'music'
+        root.mkdir()
+        secret = tmp_path / 'secret.txt'
+        secret.write_bytes(b'password')
+        link = root / 'innocent.mp3'
+        link.symlink_to(secret)
+        monkeypatch.setenv('MUSIC_DIR', str(root))
+        reads.row = {**TRACK_ROW, 'path': str(link)}
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.status_code == 404
+        assert b'password' not in res.get_data()
+
+    def test_refusal_does_not_reveal_that_the_row_exists(self, client, reads,
+                                                         monkeypatch, tmp_path):
+        root = tmp_path / 'music'
+        root.mkdir()
+        outside = tmp_path / 'secret.txt'
+        outside.write_bytes(b'x')
+        monkeypatch.setenv('MUSIC_DIR', str(root))
+        reads.row = {**TRACK_ROW, 'path': str(outside)}
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.get_json()['error'] == 'no track with id 1'
+
+    def test_indexed_but_missing_file_is_a_clear_404(self, client, reads,
+                                                     monkeypatch, tmp_path):
+        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
+        reads.row = {**TRACK_ROW, 'path': str(tmp_path / 'deleted.mp3')}
+
+        res = client.get('/music/tracks/1/stream')
+
+        assert res.status_code == 404
+        assert 'missing on disk' in res.get_json()['error']
+
+    def test_the_stream_query_selects_only_the_path(self, client, reads,
+                                                    monkeypatch, tmp_path):
+        """Server-side use, so path is the one column it should ask for."""
+        self._serve(tmp_path, monkeypatch, reads)
+
+        client.get('/music/tracks/1/stream')
+
+        query, params = reads.queries[0]
+        assert 'SELECT path FROM track' in query
+        assert params == (1,)
+
+    def test_no_route_accepts_a_client_supplied_path(self):
+        """The only way to name a file is by track id."""
+        from app import app as flask_app
+
+        for rule in flask_app.url_map.iter_rules():
+            if str(rule).startswith('/music'):
+                assert 'path' not in rule.arguments
