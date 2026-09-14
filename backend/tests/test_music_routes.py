@@ -275,14 +275,25 @@ class TestStreaming:
         assert res.status_code == 200
         assert res.get_data() == b'ID3audiodata'
 
+    @pytest.mark.parametrize('name,expected', [
+        ('song.mp3', 'audio/mpeg'),
+        ('song.flac', 'audio/flac'),
+        ('song.m4a', 'audio/mp4'),
+        ('song.ogg', 'audio/ogg'),
+        ('song.wav', 'audio/wav'),
+    ])
     def test_sets_an_audio_content_type(self, client, reads, monkeypatch,
-                                        tmp_path):
-        """An <audio> element needs a type it recognises."""
-        self._serve(tmp_path, monkeypatch, reads)
+                                        tmp_path, name, expected):
+        """An <audio> element will not play application/octet-stream.
+
+        Registered explicitly rather than guessed, because only mp3 and wav
+        are in CPython's table and the Pi may ship no system mime map.
+        """
+        self._serve(tmp_path, monkeypatch, reads, name=name)
 
         res = client.get('/music/tracks/1/stream')
 
-        assert res.mimetype == 'audio/mpeg'
+        assert res.mimetype == expected
 
     def test_advertises_range_support(self, client, reads, monkeypatch, tmp_path):
         self._serve(tmp_path, monkeypatch, reads, payload=b'0123456789')
@@ -381,3 +392,16 @@ class TestStreaming:
         for rule in flask_app.url_map.iter_rules():
             if str(rule).startswith('/music'):
                 assert 'path' not in rule.arguments
+
+
+def test_every_scanned_extension_has_an_audio_mimetype():
+    """A format the scanner indexes but serves as octet-stream is indexed
+    and unplayable. This ties the two lists together so adding an extension
+    to the scanner without a mimetype fails here."""
+    import mimetypes
+
+    from music.tags import AUDIO_EXTENSIONS
+
+    for extension in AUDIO_EXTENSIONS:
+        guessed, _ = mimetypes.guess_type(f'track{extension}')
+        assert guessed and guessed.startswith('audio/'), extension

@@ -1,9 +1,24 @@
+import mimetypes
 import os
 
 from flask import Blueprint, abort, jsonify, request, send_file
 
 from database.db import fetch_all, fetch_one
 from music.config import resolve_inside_music_dir
+
+# CPython's built-in table only covers .mp3 and .wav; the others resolve only
+# if the host happens to ship /etc/mime.types. A Raspberry Pi OS Lite image
+# may not, and send_file would then serve application/octet-stream, which
+# browsers refuse to play in an <audio> element. Register them explicitly so
+# the answer is the same on every machine.
+for _extension, _mimetype in (
+    ('.mp3', 'audio/mpeg'),
+    ('.flac', 'audio/flac'),
+    ('.m4a', 'audio/mp4'),
+    ('.ogg', 'audio/ogg'),
+    ('.wav', 'audio/wav'),
+):
+    mimetypes.add_type(_mimetype, _extension)
 
 bp = Blueprint('music', __name__)
 
@@ -122,8 +137,10 @@ def stream_track(track_id):
     The client supplies an id, never a path — the path comes from the row.
     The containment check is defence in depth: the scanner indexes whatever
     is on disk, so a symlink planted in the library would otherwise make this
-    an arbitrary-file read. A refusal returns the same 404 as an unknown id,
-    so it does not confirm the row exists.
+    an arbitrary-file read. A containment refusal returns the same 404 as an
+    unknown id, so it does not confirm the row exists. The missing-file 404 is
+    deliberately distinct: it reveals only that the id was once valid, and an
+    operator needs to tell "never existed" from "indexed but the file is gone".
     """
     track = fetch_one("SELECT path FROM track WHERE id = ? LIMIT 1", (track_id,))
     if track is None:
