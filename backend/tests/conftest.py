@@ -9,6 +9,9 @@ from app import app as flask_app
 
 SERVICE_MODULES = (blog.blog, habits.habits, music.music,
                    recipes.recipes, todo.todo)
+# music is read-only; the rest import execute/insert. Keeping them separate
+# means a rename in a write-owning module still fails loudly.
+WRITE_MODULES = (blog.blog, habits.habits, recipes.recipes, todo.todo)
 
 
 @pytest.fixture(autouse=True)
@@ -52,10 +55,9 @@ def writes(monkeypatch):
         fake.queries.append((query, params))
         return fake.new_id
 
-    for module in SERVICE_MODULES:
-        # Only some service modules write. music imports just fetch_all/fetch_one.
-        monkeypatch.setattr(module, 'execute', fake_execute, raising=False)
-        monkeypatch.setattr(module, 'insert', fake_insert, raising=False)
+    for module in WRITE_MODULES:
+        monkeypatch.setattr(module, 'execute', fake_execute)
+        monkeypatch.setattr(module, 'insert', fake_insert)
     return fake
 
 
@@ -87,7 +89,7 @@ def reads(monkeypatch):
 
     for module in SERVICE_MODULES:
         monkeypatch.setattr(module, 'fetch_all', fake_fetch_all)
-        # Only habits imports fetch_one so far.
+        # Only habits and music import fetch_one so far.
         monkeypatch.setattr(module, 'fetch_one', fake_fetch_one, raising=False)
     return fake
 

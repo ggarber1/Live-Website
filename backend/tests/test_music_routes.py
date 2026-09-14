@@ -50,11 +50,45 @@ def test_list_runs_a_count_and_a_page_query(client, reads):
 
 
 def test_list_orders_deterministically(client, reads):
-    """Without an ORDER BY, pagination can repeat or skip rows between pages."""
+    """Without an ORDER BY, pagination can repeat or skip rows between pages.
+
+    The sort ends in `id`, the primary key, as a tiebreaker: untagged tracks
+    have artist/album/track_no all NULL and can tie on title too (two folders
+    each containing "01 - Track.mp3"), and without a unique final key their
+    relative order is undefined and can change between two queries.
+    """
     reads.rows = []
     reads.row = {'n': 0}
 
     client.get('/music/tracks')
 
     page = next(q for q, _ in reads.queries if 'LIMIT' in q)
-    assert 'ORDER BY artist, album, track_no, title' in page
+    assert 'ORDER BY artist, album, track_no, title, id' in page
+
+
+def test_list_does_not_expose_the_filesystem_path(client, reads):
+    """Paths are server-side only — clients address tracks by id.
+
+    Asserted against the query text, because the stubbed reads return a fixed
+    row whatever the SELECT asks for. Task 12 checks the real response.
+    """
+    reads.rows = []
+    reads.row = {'n': 0}
+
+    client.get('/music/tracks')
+
+    page = next(q for q, _ in reads.queries if 'LIMIT' in q)
+    selected = page.split('FROM')[0]
+    assert 'SELECT *' not in selected
+    assert 'path' not in selected
+    assert 'mtime_ns' not in selected
+
+
+def test_list_does_not_swallow_query_errors(client, reads):
+    """db.py's contract: a broken read fails loudly, not as an empty page."""
+    import mariadb
+
+    reads.error = mariadb.Error('table is gone')
+
+    with pytest.raises(mariadb.Error):
+        client.get('/music/tracks')
