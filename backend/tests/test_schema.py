@@ -30,6 +30,9 @@ REQUESTS = [
     ('put', '/recipes/1', {'title': 't', 'ingredients': ['a'], 'instructions': ['b']}),
     ('delete', '/recipes/1', None),
     ('get', '/music/tracks', None),
+    # With ?q=, so the search clause is actually executed. Without it the
+    # route takes the no-filter branch and the LIKE columns are never checked.
+    ('get', '/music/tracks?q=beach', None),
     ('get', '/music/tracks/1', None),
     ('get', '/music/tracks/1/stream', None),
 ]
