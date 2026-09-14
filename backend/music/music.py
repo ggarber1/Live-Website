@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 
 from database.db import fetch_all, fetch_one
 
@@ -21,6 +21,55 @@ SELECT_PAGE = (
 )
 COUNT_ALL = "SELECT COUNT(*) AS n FROM track {where}"
 
+SEARCH_WHERE = "WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?"
+
+
+def _positive_int(name, default):
+    raw = request.args.get(name)
+    if raw is None or raw == '':
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        abort(400, description=f"{name} must be an integer")
+    if value < 0:
+        abort(400, description=f"{name} cannot be negative")
+    return value
+
+
+def _pagination():
+    limit = _positive_int('limit', DEFAULT_LIMIT)
+    if limit < 1:
+        abort(400, description="limit must be at least 1")
+    offset = _positive_int('offset', 0)
+    return min(limit, MAX_LIMIT), offset
+
+
+def _like_term(term):
+    """Wrap a search term for LIKE, escaping the wildcards it may contain.
+
+    `%` and `_` are LIKE metacharacters. Filename-derived titles are full of
+    underscores, and an unescaped `%` matches the whole library. Backslash is
+    MySQL's default LIKE escape character, so it is doubled first.
+    """
+    escaped = (term.replace('\\', '\\\\')
+                   .replace('%', r'\%')
+                   .replace('_', r'\_'))
+    return f"%{escaped}%"
+
+
+def _search():
+    """The WHERE clause and its bound parameters for ?q=, if given.
+
+    The clause is a fixed string defined in this module; only the term is a
+    bound parameter. That is the invariant noted above the query constants.
+    """
+    term = request.args.get('q', '').strip()
+    if not term:
+        return '', ()
+    like = _like_term(term)
+    return SEARCH_WHERE, (like, like, like)
+
 
 @bp.route('/music/tracks', methods=['GET'])
 def list_tracks():
@@ -33,8 +82,8 @@ def list_tracks():
     InnoDB's default REPEATABLE READ the first read fixes the snapshot for the
     rest of the transaction.
     """
-    limit, offset = DEFAULT_LIMIT, 0
-    where, params = '', ()
+    limit, offset = _pagination()
+    where, params = _search()
 
     total = fetch_one(COUNT_ALL.format(where=where), params)['n']
     rows = fetch_all(SELECT_PAGE.format(where=where), params + (limit, offset))

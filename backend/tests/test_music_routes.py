@@ -92,3 +92,103 @@ def test_list_does_not_swallow_query_errors(client, reads):
 
     with pytest.raises(mariadb.Error):
         client.get('/music/tracks')
+
+
+class TestPagination:
+    def test_limit_and_offset_are_honoured(self, client, reads):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        res = client.get('/music/tracks?limit=10&offset=20')
+
+        assert res.get_json()['limit'] == 10
+        assert res.get_json()['offset'] == 20
+        _, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
+        assert params[-2:] == (10, 20)
+
+    def test_limit_is_clamped_to_the_maximum(self, client, reads):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        res = client.get('/music/tracks?limit=99999')
+
+        assert res.get_json()['limit'] == 200
+
+    def test_exactly_the_maximum_limit_is_allowed(self, client, reads):
+        """Clamping is `min(limit, MAX_LIMIT)`, so the boundary itself passes."""
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        res = client.get('/music/tracks?limit=200')
+
+        assert res.status_code == 200
+        assert res.get_json()['limit'] == 200
+
+    @pytest.mark.parametrize('query', [
+        'limit=abc', 'offset=abc', 'limit=0', 'limit=-1', 'offset=-1',
+    ])
+    def test_invalid_pagination_is_a_400(self, client, reads, query):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        res = client.get(f'/music/tracks?{query}')
+
+        assert res.status_code == 400
+        assert 'error' in res.get_json()
+
+
+class TestSearch:
+    def test_query_filters_on_title_artist_and_album(self, client, reads):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=beach')
+
+        page, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
+        assert 'WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?' in page
+        assert params[:3] == ('%beach%', '%beach%', '%beach%')
+
+    def test_query_is_parameterised_not_interpolated(self, client, reads):
+        """A quote in the search term must not reach the SQL text."""
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get("/music/tracks?q=%27%3B%20DROP%20TABLE%20track%3B%20--")
+
+        for query, _ in reads.queries:
+            assert 'DROP TABLE' not in query
+
+    def test_count_is_filtered_by_the_same_query(self, client, reads):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=beach')
+
+        count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
+        assert 'WHERE' in count
+        assert params == ('%beach%', '%beach%', '%beach%')
+
+    def test_blank_query_is_treated_as_no_filter(self, client, reads):
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=%20%20')
+
+        count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
+        assert 'WHERE' not in count
+        assert params == ()
+
+    def test_like_metacharacters_are_escaped(self, client, reads):
+        """% and _ are LIKE wildcards, not literals.
+
+        Underscores are extremely common in this library because an untagged
+        file's title is its filename, so searching "my_song" must not also
+        match "myXsong". A bare % would match the entire library.
+        """
+        reads.rows = []
+        reads.row = {'n': 0}
+
+        client.get('/music/tracks?q=50%25_mix')
+
+        _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
+        assert params[0] == r'%50\%\_mix%'
