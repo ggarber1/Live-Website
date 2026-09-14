@@ -13,8 +13,15 @@ Group=pi
 # imports resolve relative to it (`from app import app`, `from api import ...`).
 WorkingDirectory=/home/pi/livs_website/backend
 EnvironmentFile=/home/pi/livs_website/backend/.env
+# gthread, not the default sync worker. Streaming a track holds the worker
+# for the whole transfer — a 40 MB FLAC over weak wifi is minutes — and with
+# sync workers three listeners would block every other request, including
+# /todo. Threads let one process hold several stalled transfers at once.
+# Phase 3 moves the bytes out of Python entirely via X-Accel-Redirect.
 ExecStart=/home/pi/livs_website/backend/venv/bin/gunicorn \
     --workers 3 \
+    --worker-class gthread \
+    --threads 8 \
     --bind 0.0.0.0:5000 \
     --access-logfile - \
     --error-logfile - \

@@ -145,9 +145,17 @@ sudo systemctl restart livs-api
 
 ## Notes
 
-- **Workers.** `--workers 3` suits a 4-core Pi. Each worker opens its own
-  database connection per request, so worker count multiplies concurrent
-  connections against MariaDB's `max_connections` (151 by default) — fine here.
+- **Workers.** `--workers 3` suits a 4-core Pi, with `--worker-class gthread
+  --threads 8`. Threads rather than the default sync worker because streaming
+  a track holds its handler for the entire transfer — a 40 MB FLAC over weak
+  wifi is minutes, not milliseconds. With sync workers, three people pressing
+  play would block every other request, including `/todo`, until a transfer
+  finished. Phase 3 removes the problem properly by handing the bytes to the
+  reverse proxy with `X-Accel-Redirect`.
+- **Database connections.** One per request, not per worker, and `flask.g` is
+  thread-local, so threads never share a connection. The ceiling is
+  `workers × threads` = 24, against MariaDB's default `max_connections` of
+  151 — comfortable.
 - **HTTPS.** This serves plain HTTP on the LAN. Putting it on the public
   internet means a reverse proxy (Caddy or nginx) terminating TLS in front,
   and `--bind 127.0.0.1:5000` so only the proxy can reach gunicorn.
