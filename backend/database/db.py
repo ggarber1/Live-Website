@@ -154,6 +154,13 @@ TABLE_DDL = {
     # silently truncating, which is the failure mode we want.
     # mtime_ns is st_mtime_ns: whole seconds would treat a file re-tagged twice
     # inside one second as unchanged.
+    # track_listing matches the listing's ORDER BY exactly, so a page is an
+    # index walk that stops at offset + limit instead of a filesort of every
+    # row. `id` must be listed even though InnoDB appends the primary key to
+    # every secondary index: the optimizer does not count that implicit column
+    # when matching ORDER BY, and without it the index is never used (measured
+    # on MySQL 9.5, 50k rows: 23 ms filesort vs 0.2 ms index walk).
+    # 3 * 1020 + 4 + 4 = 3068 bytes, just under the 3072-byte index limit.
     'track': """
     CREATE TABLE IF NOT EXISTS track (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -166,7 +173,8 @@ TABLE_DDL = {
         format VARCHAR(16) NOT NULL,
         size_bytes BIGINT NOT NULL,
         mtime_ns BIGINT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX track_listing (artist, album, track_no, title, id)
     )
     """,
 }

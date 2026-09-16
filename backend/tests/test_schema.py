@@ -187,3 +187,24 @@ def test_track_text_columns_match_the_tag_truncation():
     for column in ('title', 'artist', 'album'):
         assert re.search(rf'^\s*{column}\s+VARCHAR\({MAX_TEXT_LENGTH}\)',
                          ddl, re.M), column
+
+
+def test_track_listing_index_matches_the_listing_sort():
+    """The index only removes the filesort if its columns are the ORDER BY.
+
+    Column order matters: an index on (album, artist, ...) is useless to a sort
+    on (artist, album, ...). `id` has to be listed explicitly: InnoDB appends
+    the primary key to every secondary index, but the optimizer ignores that
+    implicit column when matching an ORDER BY, and the index goes unused.
+    """
+    from music.music import SELECT_PAGE
+
+    order_by = re.search(r'ORDER BY (.+?) LIMIT', SELECT_PAGE).group(1)
+    sort_columns = [c.strip() for c in order_by.split(',')]
+    assert sort_columns[-1] == 'id'
+
+    index = re.search(r'INDEX track_listing \((.+?)\)', TABLE_DDL['track'])
+    assert index, 'track has no track_listing index'
+    index_columns = [c.strip() for c in index.group(1).split(',')]
+
+    assert index_columns == sort_columns
