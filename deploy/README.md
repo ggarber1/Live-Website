@@ -132,7 +132,57 @@ npm run build
 
 Until this has run, `GET /` answers 404 with a message saying so.
 
-## 8. Install the service
+## 8. Cinema: Jellyfin
+
+Jellyfin owns the film library, metadata, artwork and transcoding; Flask
+proxies it under `/api/cinema`. Install it from the official repository:
+
+```bash
+curl -fsSL https://repo.jellyfin.org/install-debuntu.sh | sudo bash
+```
+
+Then, in `/etc/jellyfin/network.xml`, bind it to the loopback only and
+restart it:
+
+```xml
+<LocalNetworkAddresses>
+  <string>127.0.0.1</string>
+</LocalNetworkAddresses>
+```
+
+Why: Jellyfin serves streams, playlists and images **without any
+authentication** and with `Access-Control-Allow-Origin: *` (measured on
+12.1.0). On the LAN that is merely untidy; once anything is public it is
+a hole. Flask on the same host is the only client it needs.
+
+Open `http://<pi-ip>:8096` once through an SSH tunnel
+(`ssh -L 8096:127.0.0.1:8096 pi@<pi-ip>`) to run the first-time wizard, then:
+
+1. Dashboard → Libraries → Add: content type Movies, folder `/mnt/media/films`.
+2. Dashboard → Playback → Transcoding: hardware acceleration **None** (the
+   Pi 5 has no video encoder), encoding preset `veryfast`, thread count 0.
+3. Dashboard → API Keys → add one named `livs`.
+4. Dashboard → Users → the user → the id is in the page URL.
+
+Put the three values in `backend/.env`:
+
+```
+JELLYFIN_URL=http://127.0.0.1:8096
+JELLYFIN_API_KEY=...
+JELLYFIN_USER_ID=...
+```
+
+**Codecs.** An h264 film in an MKV is remuxed (video copied, audio
+re-encoded) and plays fine. An HEVC/x265 film has to be re-encoded in
+software and will stutter at 1080p. Before a film night:
+
+```bash
+./backend/venv/bin/flask --app app cinema-audit   # lists the films that will transcode video
+```
+
+Prefer x264 releases, or convert the listed ones once with ffmpeg.
+
+## 9. Install the service
 
 ```bash
 sudo cp /home/pi/livs_website/deploy/livs-api.service /etc/systemd/system/
@@ -140,7 +190,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now livs-api
 ```
 
-## 9. Verify
+## 10. Verify
 
 ```bash
 systemctl status livs-api
@@ -158,6 +208,7 @@ cd /home/pi/livs_website && git pull
 ./backend/venv/bin/pip install -r backend/requirements.txt
 ./backend/venv/bin/flask --app app init-db   # only if the schema changed
 (cd frontend && npm ci && npm run build)    # only if frontend/ changed
+./backend/venv/bin/flask --app app cinema-audit  # after adding films
 sudo systemctl restart livs-api
 ```
 

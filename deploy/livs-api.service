@@ -1,7 +1,7 @@
 [Unit]
 Description=Liv's website API
 # Wait for the database, otherwise the first requests after a reboot fail.
-After=network-online.target mariadb.service
+After=network-online.target mariadb.service jellyfin.service
 Wants=network-online.target
 
 [Service]
