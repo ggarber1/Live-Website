@@ -45,6 +45,7 @@ export default function MusicPage() {
     <>
       <div className="music">
         <h1>Music</h1>
+        <p className="subtitle">Let's Partayyy</p>
         <SearchBox onChange={search} />
         {error && <p role="alert">{error}</p>}
         {page && (

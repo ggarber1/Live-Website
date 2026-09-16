@@ -59,7 +59,7 @@ export default function TodoPage() {
   return (
     <>
       <h1>To-do</h1>
-      <p className="subtitle">Little things, crossed off one by one.</p>
+      <p className="subtitle">Get Shit Done</p>
       {error && <p role="alert">{error}</p>}
       <div className="card">
         <form className="add-row" onSubmit={add}>

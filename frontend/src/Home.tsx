@@ -8,13 +8,13 @@ import Polaroid from './photos/Polaroid'
 const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5]
 
 const SECTIONS = [
-  { to: '/music', title: 'Music', blurb: 'Everything on the shelf, ready to play.' },
-  { to: '/cinema', title: 'Cinema', blurb: 'Something to watch tonight.' },
-  { to: '/photos', title: 'Photos', blurb: 'Kept for looking back on.' },
-  { to: '/todo', title: 'To-do', blurb: 'Little things, crossed off one by one.' },
-  { to: '/habits', title: 'Habits', blurb: 'Small promises, kept daily.' },
-  { to: '/recipes', title: 'Recipes', blurb: 'The ones worth making again.' },
-  { to: '/blog', title: 'Blog', blurb: 'A page for whatever today was.' },
+  { to: '/music', title: 'Music', blurb: "Let's Partayyy" },
+  { to: '/cinema', title: 'Cinema', blurb: 'Movie Night!!!' },
+  { to: '/photos', title: 'Photos', blurb: 'Memory Lane' },
+  { to: '/todo', title: 'To-do', blurb: 'Get Shit Done' },
+  { to: '/habits', title: 'Habits', blurb: "Okay, She's Consistent" },
+  { to: '/recipes', title: 'Recipes', blurb: 'Yummmmmmm' },
+  { to: '/blog', title: 'Blog', blurb: 'Hey guys Welcome to my Story' },
 ]
 
 export default function Home() {

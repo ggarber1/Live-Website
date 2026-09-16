@@ -25,7 +25,7 @@ function FilmList() {
   return (
     <>
       <h1>Cinema</h1>
-      <p className="subtitle">Something to watch tonight.</p>
+      <p className="subtitle">Movie Night!!!</p>
       {error && <p role="alert">{error}</p>}
       {films && films.length === 0 && <p className="empty">No films yet.</p>}
       {films && films.length > 0 && <FilmGrid films={films} />}

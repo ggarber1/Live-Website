@@ -29,7 +29,7 @@ function RecipeList() {
       <div className="title-row">
         <div>
           <h1>Recipes</h1>
-          <p className="subtitle">The ones worth making again.</p>
+          <p className="subtitle">Yummmmmmm</p>
         </div>
         <Link to="/recipes/new" className="btn btn-primary">New recipe</Link>
       </div>

@@ -58,7 +58,7 @@ export default function HabitsPage() {
   return (
     <>
       <h1>Habits</h1>
-      <p className="subtitle">Small promises, kept daily.</p>
+      <p className="subtitle">Okay, She's Consistent</p>
       {error && <p role="alert">{error}</p>}
       <div className="card">
         <form className="add-row" onSubmit={add}>

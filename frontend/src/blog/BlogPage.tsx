@@ -31,7 +31,7 @@ function EntryList() {
       <div className="title-row">
         <div>
           <h1>Blog</h1>
-          <p className="subtitle">A page for whatever today was.</p>
+          <p className="subtitle">Hey guys Welcome to my Story</p>
         </div>
         <Link to="/blog/new" className="btn btn-primary">Write</Link>
       </div>
