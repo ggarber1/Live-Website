@@ -1,5 +1,16 @@
-// "Good morning, Liv" and a small line that changes with the day, so the
-// home page reads like a note left on the counter rather than a dashboard.
+// The home page greets Liv a different way each visit, cycling through
+// Greg's list in order so it never repeats twice running. The place in the
+// cycle is kept in the browser; without storage it falls back to the day.
+
+export const GREETINGS = [
+  'Hey Cutie Patootie',
+  'What Up Shotayy',
+  'BABY GIIIIRRRLLLLL',
+  "'Ello Love",
+  'Hi Darling',
+  'Uhhhhhhhm Hi :)',
+  'Yo.',
+]
 
 const LINES = [
   'What are we up to today?',
@@ -11,12 +22,22 @@ const LINES = [
   'Whatever today turns into.',
 ]
 
-export function greeting(now: Date): string {
-  const h = now.getHours()
-  if (h < 5) return 'Still up, Liv?'
-  if (h < 12) return 'Good morning, Liv'
-  if (h < 17) return 'Good afternoon, Liv'
-  return 'Good evening, Liv'
+const KEY = 'livs-greeting'
+
+function dayOfYear(now: Date): number {
+  const start = new Date(now.getFullYear(), 0, 0)
+  return Math.floor((now.getTime() - start.getTime()) / 86_400_000)
+}
+
+export function nextGreeting(now: Date = new Date()): string {
+  let index: number
+  try {
+    index = Number(localStorage.getItem(KEY) ?? '0') || 0
+    localStorage.setItem(KEY, String((index + 1) % GREETINGS.length))
+  } catch {
+    index = dayOfYear(now)
+  }
+  return GREETINGS[index % GREETINGS.length]
 }
 
 export function dateLine(now: Date): string {
@@ -27,7 +48,5 @@ export function dateLine(now: Date): string {
 }
 
 export function noteOfTheDay(now: Date): string {
-  const start = new Date(now.getFullYear(), 0, 0)
-  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86_400_000)
-  return LINES[dayOfYear % LINES.length]
+  return LINES[dayOfYear(now) % LINES.length]
 }
