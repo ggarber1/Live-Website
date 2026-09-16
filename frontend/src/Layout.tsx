@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router'
 
+import { PlayerProvider } from './music/queue'
+
 const SECTIONS: [string, string][] = [
   ['Music', '/music'],
   ['To-do', '/todo'],
@@ -10,7 +12,7 @@ const SECTIONS: [string, string][] = [
 
 export default function Layout() {
   return (
-    <>
+    <PlayerProvider>
       <header className="masthead">
         <Link to="/" className="site-name">
           Liv's <span className="ornament" aria-hidden="true">❦</span>
@@ -24,6 +26,6 @@ export default function Layout() {
       <main>
         <Outlet />
       </main>
-    </>
+    </PlayerProvider>
   )
 }

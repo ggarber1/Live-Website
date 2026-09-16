@@ -1,23 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { listTracks, PAGE_SIZE, type Track, type TrackPage } from './api'
-import Player from './Player'
+import { usePlayer } from './player-context'
 import SearchBox from './SearchBox'
 import TrackList from './TrackList'
-
-// What plays next is decided when a row is clicked, from the list as it was
-// then. Searching or paging afterwards changes the list, not the queue.
-interface Queue {
-  tracks: Track[]
-  index: number
-}
 
 export default function MusicPage() {
   const [query, setQuery] = useState('')
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState<TrackPage | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [queue, setQueue] = useState<Queue | null>(null)
+  const { playing, play: playQueue } = usePlayer()
 
   useEffect(() => {
     let stale = false
@@ -45,14 +38,8 @@ export default function MusicPage() {
 
   const play = (track: Track) => {
     if (!page) return
-    setQueue({ tracks: page.tracks, index: page.tracks.findIndex((t) => t.id === track.id) })
+    playQueue(page.tracks, page.tracks.findIndex((t) => t.id === track.id))
   }
-
-  const next = () => {
-    setQueue((q) => (q && q.index + 1 < q.tracks.length ? { ...q, index: q.index + 1 } : q))
-  }
-
-  const playing = queue ? queue.tracks[queue.index] : null
 
   return (
     <>
@@ -72,7 +59,6 @@ export default function MusicPage() {
           />
         )}
       </div>
-      <Player track={playing} onEnded={next} />
     </>
   )
 }

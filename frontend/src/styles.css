@@ -263,8 +263,8 @@ main {
 
 /* -------------------------------------------------------------- music */
 
-.music {
-  padding-bottom: 6rem; /* room for the player */
+.with-player {
+  padding-bottom: 6rem; /* room for the fixed player bar */
 }
 
 input[type="search"] {
