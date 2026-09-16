@@ -44,7 +44,7 @@ test('entries are listed as given, with date and a short excerpt', async () => {
   expect(screen.getByRole('link', { name: /write/i })).toHaveAttribute('href', '/blog/new')
 })
 
-test('an empty journal says so', async () => {
+test('an empty blog says so', async () => {
   vi.mocked(listPosts).mockResolvedValue([])
   renderAt('/blog')
 
