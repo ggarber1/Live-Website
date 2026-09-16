@@ -11,3 +11,4 @@ venv/
 env/
 # `python -m venv activate`, meant as `source venv/bin/activate`
 activate/
+frontend/dist/
