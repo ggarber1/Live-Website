@@ -12,45 +12,82 @@ Spec: `docs/superpowers/specs/2026-09-09-media-library-design.md`
 
 ---
 
-## Status — read this before following any task below
+## START HERE — handoff, 2026-09-15
 
-| Task | State | Trust the code blocks here? |
-| --- | --- | --- |
-| 1 `MUSIC_DIR` config | done | **No.** Amended: absolute-path check, falsy-path guard |
-| 2 `track` table | done | **No.** Column is `mtime_ns`, not `mtime` |
-| 3 Tag reading | done | **No.** Amended twice: numeric bounds, text truncation |
-| 4 Scanner, add files | done | **No.** Amended: dotfile skip, `on_error`, per-file write guard |
-| 5 Incremental + removal | done | Section rewritten below; code is the source of truth |
-| 6 Removal abort rail | done | Section rewritten below; widened to proportional |
-| 7 Over-length paths | done | Section rewritten below; placement is the substance |
-| 8 CLI command | done | Section rewritten below; exit-code policy is the substance |
-| 9-11 Routes | not started | Mostly accurate, but Task 9's `TRACK_ROW` fixture had a stale `mtime` key (fixed) |
-| 12 Integration tests | not started | **Stale** — asserts a five-key counts dict; there are nine |
-| 13 Manual verification | not started | **Stale** — expected CLI output predates the skip breakdown |
+**Phase 1 is functionally complete. Tasks 1-12 are done; Task 13 (manual
+end-to-end verification) is the only one left, and its section near the bottom
+of this file has been rewritten with correct expectations.**
 
-**The scanner (Tasks 1-8) is complete.** `scan_music(force_removals=False)`
-returns nine counts — `added`, `updated`, `unchanged`, `removed`, `skipped`,
-`skipped_too_long`, `skipped_unreadable`, `skipped_rejected`,
-`unreadable_dirs` — and raises `ScanAborted` rather than gutting the table.
-It handles, each distinctly and each with a test that fails when the handling
-is removed: an empty library, an unmounted drive, a reconfigured root, an
-unreadable directory, an unreadable file, a malformed tag, an oversized
-numeric value, over-length text, an over-length path, a duplicate row, and a
-dropped connection.
+Branch `feat/music-library`, 37 commits ahead of `main`, nothing uncommitted.
 
-Roughly every safety property of the scanner came out of code review rather
-than this plan, so for Tasks 1-7 **`backend/music/` and its tests are the
-specification**, not the code blocks below. The tasks are left in place for
-the reasoning and the TDD sequence, which still hold.
+```bash
+cd backend
+./venv/bin/python -m pytest tests -q                 # 295 passed, 29 deselected
+./venv/bin/python -m pytest tests -m integration -q  #  29 passed (needs MySQL + .env)
+```
 
-Two conventions established during implementation and worth keeping:
+### Do this first
+
+**`MUSIC_DIR` is not set in `backend/.env`.** Tests supply their own value, so
+nothing caught it, but the app cannot serve music without it. Add a real
+absolute path before running Task 13.
+
+### Known gaps, deliberately not done
+
+Neither is a defect; both are recorded rather than forgotten.
+
+- **No index on the sort columns.** `ORDER BY artist, album, track_no, title, id`
+  cannot use an index, so every listing request filesorts the whole matched set.
+  Fine at thousands of rows on a Pi; matters in the tens of thousands. The fix
+  is a composite index, not keyset pagination.
+- **Search is single-term substring.** `?q=beach house depression` matches
+  nothing, because no single column holds all three words. This is exactly what
+  the design spec specifies; a later task could split on whitespace or add a
+  fulltext index.
+
+### Do not trust the code blocks in Tasks 1-4
+
+They predate the fixes that review forced. `backend/music/` and its tests are
+the specification. Tasks 5-12 have been rewritten to record what was actually
+built and why; Tasks 1-4 are left as-is for their reasoning and TDD sequence.
+
+The `git log` on this branch is unusually informative — most commit messages
+explain the failure mode being closed, not just the change.
+
+### What exists
+
+**Scanner** — `scan_music(force_removals=False)` returns nine counts:
+`added`, `updated`, `unchanged`, `removed`, `skipped`, `skipped_too_long`,
+`skipped_unreadable`, `skipped_rejected`, `unreadable_dirs`. Raises
+`ScanAborted` rather than gutting the table. Handles, each distinctly and each
+with a test that fails when the handling is removed: an empty library, an
+unmounted drive, a reconfigured root, an unreadable directory, an unreadable
+file, a malformed tag, an oversized numeric value, over-length text, an
+over-length path, a duplicate row, and a dropped connection.
+
+**CLI** — `flask --app app scan-music [--force-removals]`. Exit 0 when the
+scan completed even if files were skipped; non-zero when it refused to act or
+could not finish. Nightly timer units in `deploy/`.
+
+**HTTP** — `GET /music/tracks` (paginated, searchable), `/music/tracks/<id>`,
+`/music/tracks/<id>/stream` (byte ranges). No response ever contains `path`.
+
+### Two conventions worth keeping
 
 - Clear bytecode between mutation checks: `find . -name __pycache__ -type d
   -not -path "./venv/*" -exec rm -rf {} +`. Python invalidates `.pyc` on
   mtime+size, so two edits inside one second can leave stale bytecode and make
-  a restored file look broken.
+  a restored file look broken. This wasted a debugging cycle.
 - Every new guard gets proved load-bearing by breaking it deliberately and
-  watching a named test fail.
+  watching a named test fail. Three tests in this project passed for the wrong
+  reason until that was applied — `768 == 768`, `'Traceback' not in output`,
+  and `isinstance(body, dict)` against a 404 error body.
+
+### Review state
+
+Tasks 1-11 each passed a spec-compliance review and a code-quality review.
+**Task 12's two reviews were not run** — the session ended first. The tests
+pass and were verified by hand, but they have not had an independent read.
 
 ---
 
@@ -857,935 +894,182 @@ permissions" is not actionable advice for it.
 
 ---
 
-### Task 9: Blueprint and track listing
+### Tasks 9-11: the HTTP layer — DONE, superseded
 
-**Files:**
-- Create: `backend/music/music.py`
-- Modify: `backend/app.py`
-- Modify: `backend/tests/conftest.py`
-- Test: `backend/tests/test_music_routes.py`
+Implemented across `a27f382`, `5e72303`, `59c26d7` (listing), `7e9ca25`,
+`b2e673a` (search and pagination), `aaae113`, `1ec5acc`, `5cda9ba` (single
+track and streaming), plus `608d1cf` (threaded workers, a deploy change).
 
-`conftest.py` must learn about the new module in three places: `SERVICE_MODULES`
-(so `writes`/`reads` stub it), and `db_env` (so `MUSIC_DIR` is always set, as the
-streaming route reads it).
+Original text removed. `backend/music/music.py` and
+`backend/tests/test_music_routes.py` are the specification.
 
-- [ ] **Step 1: Wire the new module into conftest**
+**Endpoints:**
 
-In `backend/tests/conftest.py`, add the import alongside the others:
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| GET | `/music/tracks` | Envelope `{tracks, total, limit, offset}`. `?q=`, `?limit=` (default 50, max 200), `?offset=`. |
+| GET | `/music/tracks/<id>` | One track, or 404. |
+| GET | `/music/tracks/<id>/stream` | The audio file, byte ranges supported. |
 
-```python
-import music.music
-```
+**Decisions review forced, which the original text did not have:**
 
-and extend the tuple:
-
-```python
-SERVICE_MODULES = (blog.blog, habits.habits, music.music,
-                   recipes.recipes, todo.todo)
-```
-
-Add to the `db_env` fixture body, so no test depends on a real music directory:
-
-```python
-    monkeypatch.setenv('MUSIC_DIR', '/tmp/livs-test-music')
-```
-
-The `reads` fixture's `fake_fetch_one` returns `fake.row` for every query. The
-listing endpoint runs a `COUNT(*)` through `fetch_one`, so tests that exercise it
-set `reads.row = {'n': <total>}`.
-
-- [ ] **Step 2: Write the failing tests**
-
-Create `backend/tests/test_music_routes.py`:
-
-```python
-import pytest
-
-TRACK_ROW = {
-    'id': 1, 'path': '/tmp/livs-test-music/a.mp3', 'title': 'Space Song',
-    'artist': 'Beach House', 'album': 'Depression Cherry', 'track_no': 5,
-    'duration_seconds': 301, 'format': 'mp3', 'size_bytes': 7_200_000,
-    'mtime_ns': 1_700_000_000_000_000_000, 'created_at': None,
-}
-
-
-def test_list_returns_tracks_with_pagination_envelope(client, reads):
-    reads.rows = [TRACK_ROW]
-    reads.row = {'n': 1}
-
-    res = client.get('/music/tracks')
-
-    assert res.status_code == 200
-    body = res.get_json()
-    assert body['tracks'][0]['title'] == 'Space Song'
-    assert body['total'] == 1
-    assert body['limit'] == 50
-    assert body['offset'] == 0
-
-
-def test_list_envelope_is_an_object_not_a_bare_array(client, reads):
-    """Unlike the other services: a library is too big to return whole."""
-    reads.rows = []
-    reads.row = {'n': 0}
-
-    assert isinstance(client.get('/music/tracks').get_json(), dict)
-
-
-def test_list_runs_a_count_and_a_page_query(client, reads):
-    reads.rows = []
-    reads.row = {'n': 0}
-
-    client.get('/music/tracks')
-
-    queries = [q for q, _ in reads.queries]
-    assert any('COUNT(*)' in q for q in queries)
-    assert any('LIMIT ? OFFSET ?' in q for q in queries)
-
-
-def test_list_orders_deterministically(client, reads):
-    reads.rows = []
-    reads.row = {'n': 0}
-
-    client.get('/music/tracks')
-
-    page = next(q for q, _ in reads.queries if 'LIMIT' in q)
-    assert 'ORDER BY artist, album, track_no, title' in page
-```
-
-- [ ] **Step 3: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'music.music'`
-
-- [ ] **Step 4: Write the implementation**
-
-Create `backend/music/music.py`:
-
-```python
-from flask import Blueprint, jsonify, request
-
-from database.db import fetch_all, fetch_one
-
-bp = Blueprint('music', __name__)
-
-DEFAULT_LIMIT = 50
-MAX_LIMIT = 200
-
-SELECT_PAGE = (
-    "SELECT * FROM track {where} "
-    "ORDER BY artist, album, track_no, title LIMIT ? OFFSET ?"
-)
-COUNT_ALL = "SELECT COUNT(*) AS n FROM track {where}"
-
-
-@bp.route('/music/tracks', methods=['GET'])
-def list_tracks():
-    """A page of the library.
-
-    Returns an envelope rather than a bare array — unlike the other services,
-    this table holds thousands of rows and the client needs the total to
-    paginate.
-    """
-    limit, offset = DEFAULT_LIMIT, 0
-    where, params = '', ()
-
-    total = fetch_one(COUNT_ALL.format(where=where), params)['n']
-    rows = fetch_all(SELECT_PAGE.format(where=where), params + (limit, offset))
-    return jsonify({
-        'tracks': rows, 'total': total, 'limit': limit, 'offset': offset,
-    })
-```
-
-`where` is interpolated with `.format`, but it only ever holds a fixed literal
-defined in this file — every value from the client is a bound `?` parameter.
-Task 10 adds the search clause the same way.
-
-In `backend/app.py`, add to the import block:
-
-```python
-from music.music import bp as music_bp
-```
-
-and register it with the others:
-
-```python
-app.register_blueprint(music_bp)
-```
-
-- [ ] **Step 5: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q`
-Expected: PASS, 4 passed
-
-- [ ] **Step 6: Run the full suite**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests -q`
-Expected: PASS, 201 passed, 8 deselected
-
-- [ ] **Step 7: Commit**
-
-```bash
-cd backend
-git add music/music.py app.py tests/conftest.py tests/test_music_routes.py
-git commit -m "feat(music): add paginated track listing"
-```
+- **`TRACK_COLUMNS`, never `SELECT *`.** `path` and `mtime_ns` are excluded
+  from every client-facing response. `path` is the Pi's filesystem layout, and
+  `mtime_ns` (~1.7e18) exceeds JavaScript's `Number.MAX_SAFE_INTEGER`, so a
+  browser doing `JSON.parse` would corrupt it silently. Both routes use it.
+- **`ORDER BY ... , id`.** The sort ends on the primary key. Without a unique
+  tiebreaker, untagged tracks — all NULL artist/album/track_no — tie on title
+  too, their order between queries is undefined, and a client paging through
+  sees duplicates and misses rows.
+- **`ESCAPE '!'`, stated explicitly.** `%` and `_` are LIKE metacharacters, and
+  filename-derived titles are full of underscores, so `my_song` must not match
+  `myXsong`. `!` rather than the default backslash because a backslash in an
+  ESCAPE clause is itself subject to `sql_mode`: under `NO_BACKSLASH_ESCAPES`
+  the literal `'\\'` is two characters and ESCAPE rejects it. `_like_term`
+  escapes the escape character first.
+- **Audio mimetypes registered with `mimetypes.add_type`.** Only `.mp3` and
+  `.wav` are in CPython's built-in table; `.flac`, `.m4a` and `.ogg` resolve
+  only if the host ships `/etc/mime.types`, which a Pi OS Lite image may not.
+  Without this, three of five formats serve `application/octet-stream` and
+  browsers refuse to play them. `audio/mp4` for `.m4a` — the system table's
+  `audio/mp4a-latm` is an RTP transport type that never plays.
+- **A containment refusal returns the unknown-id 404 verbatim**, so it does not
+  confirm the row exists. The missing-file 404 is deliberately distinct.
+- **`gthread` workers.** `send_file` streams through the worker, so a 40 MB
+  FLAC over weak wifi holds it for minutes; with sync workers three listeners
+  would block every request including `/todo`. Safe only because connections
+  are per-request on `flask.g`, which is thread-local — verified eight
+  concurrent contexts produce eight distinct connections.
 
 ---
 
-### Task 10: Search and pagination parameters
+### Task 12: Integration tests — DONE, superseded
 
-**Files:**
-- Modify: `backend/music/music.py`
-- Test: `backend/tests/test_music_routes.py`
+Implemented in `6329e31`. 21 new tests, 29 integration total, in
+`backend/tests/test_integration_music.py`. Deselected by default; run with
+`pytest tests -m integration`.
 
-- [ ] **Step 1: Write the failing tests**
+Original text removed: it asserted a five-key counts dict and covered only
+happy-path round trips.
 
-Append to `backend/tests/test_music_routes.py`:
+This task exists because every other test stubs the database, which is how
+`GET /recipes` once shipped returning 500 for any stored row — MySQL hands
+`JSON` columns back as bytes and no stub ever produced bytes. So it verifies
+the things a stub structurally cannot represent:
 
-```python
-class TestPagination:
-    def test_limit_and_offset_are_honoured(self, client, reads):
-        reads.rows = []
-        reads.row = {'n': 0}
+- the real JSON response contains no `path` and no `mtime_ns`, and the
+  filesystem root appears nowhere in the payload;
+- `mtime_ns` and `size_bytes` come back as Python `int`, which is what makes
+  the incremental skip fire rather than rewriting every file every scan;
+- MySQL's own LIKE semantics — an underscore search matches one row, not all;
+- a 500-character tag stores truncated rather than failing the insert against
+  `VARCHAR(255)` in strict mode;
+- an over-length path is skipped while its siblings still index;
+- a 4-byte character (emoji) survives the utf8mb4 column;
+- real mimetypes from real files through the real route;
+- pagination covers every row exactly once with no overlap.
 
-        res = client.get('/music/tracks?limit=10&offset=20')
-
-        assert res.get_json()['limit'] == 10
-        assert res.get_json()['offset'] == 20
-        _, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
-        assert params[-2:] == (10, 20)
-
-    def test_limit_is_clamped_to_the_maximum(self, client, reads):
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        res = client.get('/music/tracks?limit=99999')
-
-        assert res.get_json()['limit'] == 200
-
-    @pytest.mark.parametrize('query', [
-        'limit=abc', 'offset=abc', 'limit=0', 'limit=-1', 'offset=-1',
-    ])
-    def test_invalid_pagination_is_a_400(self, client, reads, query):
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        res = client.get(f'/music/tracks?{query}')
-
-        assert res.status_code == 400
-        assert 'error' in res.get_json()
-
-
-class TestSearch:
-    def test_query_filters_on_title_artist_and_album(self, client, reads):
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        client.get('/music/tracks?q=beach')
-
-        page, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
-        assert 'WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?' in page
-        assert params[:3] == ('%beach%', '%beach%', '%beach%')
-
-    def test_query_is_parameterised_not_interpolated(self, client, reads):
-        """A quote in the search term must not reach the SQL text."""
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        client.get("/music/tracks?q=%27%3B%20DROP%20TABLE%20track%3B%20--")
-
-        for query, _ in reads.queries:
-            assert 'DROP TABLE' not in query
-
-    def test_count_is_filtered_by_the_same_query(self, client, reads):
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        client.get('/music/tracks?q=beach')
-
-        count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
-        assert 'WHERE' in count
-        assert params == ('%beach%', '%beach%', '%beach%')
-
-    def test_blank_query_is_treated_as_no_filter(self, client, reads):
-        reads.rows = []
-        reads.row = {'n': 0}
-
-        client.get('/music/tracks?q=%20%20')
-
-        count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
-        assert 'WHERE' not in count
-        assert params == ()
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q -k "Pagination or Search"`
-Expected: FAIL — `assert 50 == 10`; parameters are ignored.
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/music.py`, add `abort` to the Flask import:
-
-```python
-from flask import Blueprint, abort, jsonify, request
-```
-
-Add the two helpers above `list_tracks`:
-
-```python
-SEARCH_WHERE = "WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?"
-
-
-def _positive_int(name, default):
-    raw = request.args.get(name)
-    if raw is None or raw == '':
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        abort(400, description=f"{name} must be an integer")
-    if value < 0:
-        abort(400, description=f"{name} cannot be negative")
-    return value
-
-
-def _pagination():
-    limit = _positive_int('limit', DEFAULT_LIMIT)
-    if limit < 1:
-        abort(400, description="limit must be at least 1")
-    offset = _positive_int('offset', 0)
-    return min(limit, MAX_LIMIT), offset
-
-
-def _search():
-    """The WHERE clause and its bound parameters for ?q=, if given."""
-    term = request.args.get('q', '').strip()
-    if not term:
-        return '', ()
-    like = f"%{term}%"
-    return SEARCH_WHERE, (like, like, like)
-```
-
-Replace the first three statements of `list_tracks`' body:
-
-```python
-    limit, offset = DEFAULT_LIMIT, 0
-    where, params = '', ()
-```
-
-with:
-
-```python
-    limit, offset = _pagination()
-    where, params = _search()
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q`
-Expected: PASS, 15 passed
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd backend
-git add music/music.py tests/test_music_routes.py
-git commit -m "feat(music): add search and pagination to the listing"
-```
+Demonstrated rather than asserted: reverting `TRACK_COLUMNS` to `*` fails the
+response test, and breaking `_like_term` makes an underscore search return
+every row in the library — a consequence no stub can observe.
 
 ---
 
-### Task 11: Single track and streaming
+### Task 13: Manual verification end to end — THE ONLY TASK REMAINING
 
-**Files:**
-- Modify: `backend/music/music.py`
-- Modify: `backend/tests/test_schema.py`
-- Test: `backend/tests/test_music_routes.py`
+**Files:** none. Verification only.
 
-The client sends a track id and never a path. This is the feature's most
-important security property: an endpoint accepting a client-supplied filename
-would read any file on the Pi.
+The plan's original steps are stale — they predate the skip breakdown in the
+CLI output and the fifth table. Use these.
 
-- [ ] **Step 1: Write the failing tests**
+**Prerequisite, and the reason this has not been run yet:** `MUSIC_DIR` is not
+set in `backend/.env`. Tests supply their own, so nothing caught it. Add it
+before starting:
 
-Append to `backend/tests/test_music_routes.py`:
-
-```python
-class TestSingleTrack:
-    def test_returns_the_track(self, client, reads):
-        reads.row = TRACK_ROW
-
-        res = client.get('/music/tracks/1')
-
-        assert res.status_code == 200
-        assert res.get_json()['title'] == 'Space Song'
-
-    def test_unknown_id_is_a_404(self, client, reads):
-        reads.row = None
-
-        res = client.get('/music/tracks/999')
-
-        assert res.status_code == 404
-        assert 'no track with id 999' in res.get_json()['error']
-
-    def test_looks_up_by_bound_id(self, client, reads):
-        reads.row = TRACK_ROW
-
-        client.get('/music/tracks/1')
-
-        query, params = reads.queries[0]
-        assert params == (1,)
-
-
-class TestStreaming:
-    def test_serves_a_file_inside_the_music_root(self, client, reads,
-                                                 monkeypatch, tmp_path):
-        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
-        song = tmp_path / 'song.mp3'
-        song.write_bytes(b'ID3audiodata')
-        reads.row = {**TRACK_ROW, 'path': str(song)}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.status_code == 200
-        assert res.get_data() == b'ID3audiodata'
-
-    def test_advertises_range_support(self, client, reads, monkeypatch, tmp_path):
-        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
-        song = tmp_path / 'song.mp3'
-        song.write_bytes(b'0123456789')
-        reads.row = {**TRACK_ROW, 'path': str(song)}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.headers['Accept-Ranges'] == 'bytes'
-
-    def test_range_request_returns_partial_content(self, client, reads,
-                                                   monkeypatch, tmp_path):
-        """Seeking in an <audio> element depends on this."""
-        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
-        song = tmp_path / 'song.mp3'
-        song.write_bytes(b'0123456789')
-        reads.row = {**TRACK_ROW, 'path': str(song)}
-
-        res = client.get('/music/tracks/1/stream',
-                         headers={'Range': 'bytes=2-5'})
-
-        assert res.status_code == 206
-        assert res.get_data() == b'2345'
-        assert res.headers['Content-Range'] == 'bytes 2-5/10'
-
-    def test_unknown_id_is_a_404(self, client, reads):
-        reads.row = None
-
-        assert client.get('/music/tracks/999/stream').status_code == 404
-
-    def test_path_outside_the_root_is_refused(self, client, reads,
-                                              monkeypatch, tmp_path):
-        """A row pointing outside MUSIC_DIR must not be served."""
-        root = tmp_path / 'music'
-        root.mkdir()
-        secret = tmp_path / 'secret.txt'
-        secret.write_bytes(b'password')
-        monkeypatch.setenv('MUSIC_DIR', str(root))
-        reads.row = {**TRACK_ROW, 'path': str(secret)}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.status_code == 404
-        assert b'password' not in res.get_data()
-
-    def test_symlink_escaping_the_root_is_refused(self, client, reads,
-                                                  monkeypatch, tmp_path):
-        root = tmp_path / 'music'
-        root.mkdir()
-        secret = tmp_path / 'secret.txt'
-        secret.write_bytes(b'password')
-        link = root / 'innocent.mp3'
-        link.symlink_to(secret)
-        monkeypatch.setenv('MUSIC_DIR', str(root))
-        reads.row = {**TRACK_ROW, 'path': str(link)}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.status_code == 404
-        assert b'password' not in res.get_data()
-
-    def test_refusal_does_not_reveal_that_the_row_exists(self, client, reads,
-                                                         monkeypatch, tmp_path):
-        root = tmp_path / 'music'
-        root.mkdir()
-        outside = tmp_path / 'secret.txt'
-        outside.write_bytes(b'x')
-        monkeypatch.setenv('MUSIC_DIR', str(root))
-        reads.row = {**TRACK_ROW, 'path': str(outside)}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.get_json()['error'] == 'no track with id 1'
-
-    def test_indexed_but_missing_file_is_a_clear_404(self, client, reads,
-                                                     monkeypatch, tmp_path):
-        monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
-        reads.row = {**TRACK_ROW, 'path': str(tmp_path / 'deleted.mp3')}
-
-        res = client.get('/music/tracks/1/stream')
-
-        assert res.status_code == 404
-        assert 'missing on disk' in res.get_json()['error']
-
-    def test_no_route_accepts_a_client_supplied_path(self):
-        """The only way to name a file is by track id."""
-        from app import app as flask_app
-
-        for rule in flask_app.url_map.iter_rules():
-            if str(rule).startswith('/music'):
-                assert 'path' not in rule.arguments
+```
+MUSIC_DIR=/absolute/path/to/a/music/directory
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q -k "SingleTrack or Streaming"`
-Expected: FAIL — 404 from Flask's router; the routes do not exist.
-
-- [ ] **Step 3: Write the implementation**
-
-In `backend/music/music.py`, add to the imports:
-
-```python
-import os
-
-from flask import Blueprint, abort, jsonify, request, send_file
-
-from database.db import fetch_all, fetch_one
-from music.config import resolve_inside_music_dir
-```
-
-Append the two routes:
-
-```python
-@bp.route('/music/tracks/<int:track_id>', methods=['GET'])
-def get_track(track_id):
-    track = fetch_one("SELECT * FROM track WHERE id = ? LIMIT 1", (track_id,))
-    if track is None:
-        abort(404, description=f"no track with id {track_id}")
-    return jsonify(track)
-
-
-@bp.route('/music/tracks/<int:track_id>/stream', methods=['GET'])
-def stream_track(track_id):
-    """Serve the audio file for a track, supporting range requests.
-
-    The client supplies an id, never a path — the path comes from the row. The
-    containment check is defence in depth: the scanner indexes whatever is on
-    disk, so a symlink planted in the library would otherwise make this an
-    arbitrary-file read. A refusal returns the same 404 as an unknown id so it
-    does not confirm the row exists.
-    """
-    track = fetch_one("SELECT path FROM track WHERE id = ? LIMIT 1", (track_id,))
-    if track is None:
-        abort(404, description=f"no track with id {track_id}")
-
-    path = resolve_inside_music_dir(track['path'])
-    if path is None:
-        abort(404, description=f"no track with id {track_id}")
-    if not os.path.isfile(path):
-        abort(404, description=f"track {track_id} is indexed but missing on disk")
-
-    # conditional=True makes Flask honour Range and return 206, which is what
-    # lets an <audio> element seek. Phase 3 replaces this with X-Accel-Redirect
-    # so gunicorn workers are not held open for the length of a track.
-    return send_file(path, conditional=True)
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_music_routes.py -q`
-Expected: PASS, 27 passed
-
-- [ ] **Step 5: Extend the schema guard to the new routes**
-
-In `backend/tests/test_schema.py`, add to `REQUESTS`:
-
-```python
-    ('get', '/music/tracks', None),
-    ('get', '/music/tracks/1', None),
-    ('get', '/music/tracks/1/stream', None),
-```
-
-The guard's stub row must satisfy every route it now exercises — the listing
-reads `['n']` from the count, and the stream route reads `['path']`. Change:
-
-```python
-    reads.row = {'id': 1, 'name': 'x', 'streak': 1, 'last_completed': None}
-```
-
-to:
-
-```python
-    reads.row = {'id': 1, 'name': 'x', 'streak': 1, 'last_completed': None,
-                 'n': 0, 'path': '/tmp/livs-test-music/probe.mp3'}
-```
-
-The guard only inspects columns named with `=` or `LIKE`, so extend
-`referenced_columns` to catch the search clause. After the existing
-`columns |= set(re.findall(r'(\w+)\s*=', sql))` line, add:
-
-```python
-    # `title LIKE ?` names a column just as much as `title = ?` does.
-    columns |= set(re.findall(r'(\w+)\s+LIKE\b', sql))
-```
-
-- [ ] **Step 6: Run the full suite**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests -q`
-Expected: PASS, 224 passed, 8 deselected
-
-- [ ] **Step 7: Confirm the schema guard is not vacuous**
-
-Temporarily change `SEARCH_WHERE` in `backend/music/music.py` to use
-`titel LIKE ?`, then run:
-
-Run: `cd backend && ./venv/bin/python -m pytest tests/test_schema.py -q`
-Expected: FAIL with `references missing column(s) {'titel'}`
-
-Revert the typo and re-run to confirm PASS. If it passed with the typo in place,
-the `LIKE` pattern is not working — stop and fix it.
-
-- [ ] **Step 8: Commit**
-
-```bash
-cd backend
-git add music/music.py tests/test_music_routes.py tests/test_schema.py
-git commit -m "feat(music): add single track and range-capable streaming"
-```
-
----
-
-### Task 12: Integration tests against real files and a real database
-
-**Files:**
-- Create: `backend/tests/test_integration_music.py`
-
-Stubbed tests are what let the recipes JSON-column bug ship, so the scanner and
-streaming get real round trips. Follow the fixture pattern in
-`backend/tests/test_integration.py`: `monkeypatch.undo()` to drop conftest's fake
-config, skip cleanly when no database is reachable, and clean up rows afterwards.
-
-- [ ] **Step 1: Write the tests**
-
-Create `backend/tests/test_integration_music.py`:
-
-```python
-"""Round trips for the music library against a real database and real files.
-
-Deselected by default (see pytest.ini). Run with:  pytest -m integration
-"""
-import os
-
-import mariadb
-import pytest
-from dotenv import load_dotenv
-
-from app import app as flask_app
-from database import db
-from music import scanner
-
-pytestmark = pytest.mark.integration
-
-load_dotenv()
-
-
-@pytest.fixture
-def real_env(monkeypatch, tmp_path):
-    """Drop conftest's fake DB config, but keep MUSIC_DIR on a temp library."""
-    monkeypatch.undo()
-    load_dotenv(override=True)
-    monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
-    return tmp_path
-
-
-@pytest.fixture
-def live_db(real_env):
-    try:
-        with flask_app.app_context():
-            db.fetch_all("SELECT 1")
-    except (mariadb.Error, RuntimeError) as err:
-        pytest.skip(f"no database available: {err}")
-    yield
-    with flask_app.app_context():
-        db.execute("DELETE FROM track")
-
-
-@pytest.fixture
-def library(real_env, live_db):
-    return real_env
-
-
-@pytest.fixture
-def client(live_db):
-    flask_app.config.update(TESTING=True)
-    return flask_app.test_client()
-
-
-def write_audio(root, relative, payload=b'ID3' + b'x' * 2048):
-    path = root / relative
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(payload)
-    return path
-
-
-def test_scan_indexes_real_files(library, client):
-    write_audio(library, 'Artist/Album/01 One.mp3')
-    write_audio(library, 'Artist/Album/02 Two.flac')
-
-    with flask_app.app_context():
-        counts = scanner.scan_music()
-
-    assert counts['added'] == 2
-
-    body = client.get('/music/tracks').get_json()
-    assert body['total'] == 2
-    assert {t['format'] for t in body['tracks']} == {'mp3', 'flac'}
-
-
-def test_untagged_file_still_gets_a_title_from_its_filename(library, client):
-    write_audio(library, 'Mystery Track.mp3')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-
-    titles = [t['title'] for t in client.get('/music/tracks').get_json()['tracks']]
-    assert 'Mystery Track' in titles
-
-
-def test_rescan_is_incremental(library):
-    write_audio(library, 'song.mp3')
-
-    with flask_app.app_context():
-        first = scanner.scan_music()
-        second = scanner.scan_music()
-
-    assert first['added'] == 1
-    assert second == {'added': 0, 'updated': 0, 'unchanged': 1,
-                      'removed': 0, 'skipped': 0}
-
-
-def test_rescan_after_edit_updates_in_place_keeping_the_id(library, client):
-    path = write_audio(library, 'song.mp3')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-    before = client.get('/music/tracks').get_json()['tracks'][0]['id']
-
-    path.write_bytes(b'ID3' + b'y' * 4096)
-    os.utime(path, (1, 1))
-    with flask_app.app_context():
-        counts = scanner.scan_music()
-
-    after = client.get('/music/tracks').get_json()['tracks'][0]['id']
-    assert counts['updated'] == 1
-    assert after == before, "ids must survive an update for playlists later"
-
-
-def test_rescan_removes_deleted_files(library, client):
-    path = write_audio(library, 'gone.mp3')
-    write_audio(library, 'kept.mp3')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-    path.unlink()
-    with flask_app.app_context():
-        counts = scanner.scan_music()
-
-    assert counts['removed'] == 1
-    assert client.get('/music/tracks').get_json()['total'] == 1
-
-
-def test_scan_aborts_instead_of_emptying_the_library(library, client):
-    write_audio(library, 'song.mp3')
-    with flask_app.app_context():
-        scanner.scan_music()
-
-    for child in library.iterdir():
-        child.unlink()
-
-    with flask_app.app_context():
-        with pytest.raises(scanner.ScanAborted):
-            scanner.scan_music()
-
-    assert client.get('/music/tracks').get_json()['total'] == 1, \
-        "the row must survive an aborted scan"
-
-
-def test_unicode_paths_and_search_round_trip(library, client):
-    write_audio(library, 'Sigur Rós/Ágætis byrjun/Svefn-g-englar.mp3')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-
-    body = client.get('/music/tracks?q=Svefn').get_json()
-    assert body['total'] == 1
-    assert 'Svefn' in body['tracks'][0]['title']
-
-
-def test_stream_returns_the_bytes_on_disk(library, client):
-    write_audio(library, 'song.mp3', payload=b'EXACTBYTES')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-    track_id = client.get('/music/tracks').get_json()['tracks'][0]['id']
-
-    res = client.get(f'/music/tracks/{track_id}/stream')
-
-    assert res.status_code == 200
-    assert res.get_data() == b'EXACTBYTES'
-
-
-def test_stream_honours_a_range_request(library, client):
-    write_audio(library, 'song.mp3', payload=b'0123456789')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-    track_id = client.get('/music/tracks').get_json()['tracks'][0]['id']
-
-    res = client.get(f'/music/tracks/{track_id}/stream',
-                     headers={'Range': 'bytes=3-6'})
-
-    assert res.status_code == 206
-    assert res.get_data() == b'3456'
-
-
-def test_pagination_walks_the_whole_library(library, client):
-    for i in range(5):
-        write_audio(library, f'{i:02d}.mp3')
-
-    with flask_app.app_context():
-        scanner.scan_music()
-
-    first = client.get('/music/tracks?limit=2&offset=0').get_json()
-    second = client.get('/music/tracks?limit=2&offset=2').get_json()
-    third = client.get('/music/tracks?limit=2&offset=4').get_json()
-
-    assert first['total'] == 5
-    assert len(first['tracks']) == 2
-    assert len(third['tracks']) == 1
-    ids = {t['id'] for t in first['tracks']} | {t['id'] for t in second['tracks']}
-    assert len(ids) == 4, "pages must not overlap"
-```
-
-- [ ] **Step 2: Run the integration tests**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests -m integration -q`
-Expected: PASS, 18 passed (10 new plus the existing 8)
-
-If they skip with "no database available", `backend/.env` is missing or MySQL is
-not running — see `deploy/README.md`.
-
-- [ ] **Step 3: Confirm the default suite still excludes them and passes**
-
-Run: `cd backend && ./venv/bin/python -m pytest tests -q`
-Expected: PASS, 224 passed, 18 deselected
-
-- [ ] **Step 4: Confirm the real database is left clean**
-
-Run:
-
-```bash
-/opt/homebrew/opt/mysql/bin/mysql -u root -D livs -e "SELECT COUNT(*) FROM track;"
-```
-
-Expected: `0`
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd backend
-git add tests/test_integration_music.py
-git commit -m "test(music): add real-file integration tests"
-```
-
----
-
-### Task 13: Manual verification end to end
-
-**Files:** none — verification only.
-
-- [ ] **Step 1: Build a small real library**
+- [ ] **Step 1: build a small real library**
 
 ```bash
 mkdir -p /tmp/livs-music/Demo
-cd /tmp/livs-music/Demo
-# Any real audio file will do. If ffmpeg is available, synthesise one:
 ffmpeg -f lavfi -i "sine=frequency=440:duration=5" -c:a libmp3lame \
   -metadata title="Test Tone" -metadata artist="Synth" \
-  -metadata album="Demo Album" tone.mp3
+  -metadata album="Demo Album" /tmp/livs-music/Demo/tone.mp3
 ```
 
-If ffmpeg is unavailable, copy any mp3 or FLAC you have into that directory
-instead; the scanner does not require valid tags.
+If ffmpeg is unavailable, copy any real mp3 or flac in instead — the scanner
+does not require valid tags.
 
-- [ ] **Step 2: Point the app at it and scan**
+- [ ] **Step 2: point the app at it and index**
 
 ```bash
-cd /Users/ggarb/Desktop/personal/livs_website/backend
+cd backend
 MUSIC_DIR=/tmp/livs-music ./venv/bin/flask --app app init-db
 MUSIC_DIR=/tmp/livs-music ./venv/bin/flask --app app scan-music
 ```
 
-Expected: `added 1, updated 0, unchanged 0, removed 0, skipped 0`
+Expect `Tables ready: todo, recipes, habits, blog, track` then
+`added 1, updated 0, unchanged 0, removed 0`. A clean run prints no second
+line; a skip line appears only when something was skipped.
 
-- [ ] **Step 3: Serve it and check the endpoints**
+- [ ] **Step 3: serve it and exercise every endpoint**
 
 ```bash
-cd /Users/ggarb/Desktop/personal/livs_website/backend
+cd backend
 MUSIC_DIR=/tmp/livs-music ./venv/bin/gunicorn --workers 2 \
-  --bind 127.0.0.1:5055 app:app &
+  --worker-class gthread --threads 4 --bind 127.0.0.1:5055 app:app &
 sleep 3
 curl -s 'localhost:5055/music/tracks' | head -c 400; echo
 curl -s 'localhost:5055/music/tracks?q=tone' | head -c 200; echo
-curl -s -o /dev/null -w 'full:%{http_code} %{size_download} bytes\n' \
+curl -s -o /dev/null -w 'full:  %{http_code} %{size_download} bytes %{content_type}\n' \
   localhost:5055/music/tracks/1/stream
 curl -s -o /dev/null -H 'Range: bytes=0-99' \
-  -w 'range:%{http_code} %{size_download} bytes\n' \
+  -w 'range: %{http_code} %{size_download} bytes\n' \
   localhost:5055/music/tracks/1/stream
 ```
 
-Expected: the listing shows `"total": 1` with `"title": "Test Tone"`; the search
-returns it; the full request is `200` with the file's full size; the range
-request is `206` with exactly `100 bytes`.
+Expect: the listing shows `"total": 1` with `"title": "Test Tone"` and **no
+`path` key**; the search finds it; the full request is `200` with
+`audio/mpeg`; the range request is `206` with exactly `100 bytes`.
 
-- [ ] **Step 4: Confirm a rescan is a no-op**
+- [ ] **Step 4: confirm a rescan is a no-op**
 
 ```bash
 MUSIC_DIR=/tmp/livs-music ./venv/bin/flask --app app scan-music
 ```
 
-Expected: `added 0, updated 0, unchanged 1, removed 0, skipped 0`
+Expect `added 0, updated 0, unchanged 1, removed 0`. If it says `updated 1`,
+the incremental skip is not firing — investigate rather than shrugging.
 
-- [ ] **Step 5: Confirm the abort rail on a real empty directory**
+- [ ] **Step 5: confirm the abort rail on a real empty directory**
 
 ```bash
 mkdir -p /tmp/livs-music-empty
 MUSIC_DIR=/tmp/livs-music-empty ./venv/bin/flask --app app scan-music; echo "exit=$?"
 ```
 
-Expected: an error mentioning the row count and "Is the drive mounted?", with a
-non-zero exit and no traceback. Then confirm nothing was deleted:
+Expect a non-zero exit and a message naming the row count and asking whether
+the drive is mounted, with no traceback. Then confirm nothing was deleted:
 
 ```bash
 curl -s 'localhost:5055/music/tracks' | head -c 120; echo
 ```
 
-Expected: still `"total": 1`
+Expect still `"total": 1`.
 
-- [ ] **Step 6: Tear down**
+- [ ] **Step 6: play it in an actual browser**
+
+The only step no test covers. Open a page with
+`<audio controls src="http://localhost:5055/music/tracks/1/stream">`, press
+play, and drag the scrubber. Seeking is what the `206` support exists for.
+
+- [ ] **Step 7: tear down**
 
 ```bash
 kill %1
-cd /Users/ggarb/Desktop/personal/livs_website/backend
-./venv/bin/python -c "
+cd backend && ./venv/bin/python -c "
 from app import app
 from database import db
 with app.app_context():
@@ -1795,9 +1079,9 @@ with app.app_context():
 rm -rf /tmp/livs-music /tmp/livs-music-empty
 ```
 
-- [ ] **Step 7: Commit nothing; report results**
+- [ ] **Step 8: report, do not commit**
 
-No code changes in this task. Report the observed output of each step.
+No code changes. Report the observed output of each step.
 
 ---
 
