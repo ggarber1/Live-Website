@@ -110,6 +110,42 @@ class TestListing:
         assert res.get_json() == {'error': 'no such film'}
 
 
+class TestImages:
+    def test_the_poster_is_proxied_and_cacheable(self, client, jellyfin):
+        jellyfin['upstream'] = FakeUpstream(b'\xff\xd8jpeg', headers={'Content-Type': 'image/jpeg', 'Content-Length': '6'})
+
+        res = client.get(f'/api/cinema/films/{DIRECT_ID}/poster?w=300')
+
+        assert res.status_code == 200
+        assert res.data == b'\xff\xd8jpeg'
+        assert res.headers['Content-Type'] == 'image/jpeg'
+        assert res.headers['Cache-Control'] == 'public, max-age=86400'
+        assert jellyfin['calls'][0][1] == f'/Items/{DIRECT_ID}/Images/Primary'
+        assert jellyfin['calls'][0][3] == {'maxWidth': 300}
+
+    def test_the_backdrop_is_the_first_backdrop(self, client, jellyfin):
+        jellyfin['upstream'] = FakeUpstream(b'x', headers={'Content-Type': 'image/jpeg'})
+
+        client.get(f'/api/cinema/films/{DIRECT_ID}/backdrop')
+
+        assert jellyfin['calls'][0][1] == f'/Items/{DIRECT_ID}/Images/Backdrop/0'
+        assert jellyfin['calls'][0][3] == {'maxWidth': 1280}
+
+    @pytest.mark.parametrize('w', ['0', '2001', 'big', '-1'])
+    def test_a_bad_width_is_a_400_before_any_request(self, client, jellyfin, w):
+        res = client.get(f'/api/cinema/films/{DIRECT_ID}/poster?w={w}')
+
+        assert res.status_code == 400
+        assert jellyfin['calls'] == []
+
+    def test_no_poster_is_a_404(self, client, jellyfin):
+        jellyfin['error'] = JellyfinNotFound()
+
+        res = client.get(f'/api/cinema/films/{DIRECT_ID}/poster')
+
+        assert res.status_code == 404
+
+
 class TestPlay:
     def test_direct_play_points_at_the_file_route(self, client, jellyfin):
         jellyfin['playbackinfo'] = fixture('playbackinfo_direct.json')

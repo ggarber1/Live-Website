@@ -63,6 +63,34 @@ def film(item_id):
     return to_film(item)
 
 
+IMAGE_CACHE = 'public, max-age=86400'
+MAX_IMAGE_WIDTH = 2000
+
+
+def _image(item_id, kind, default_width):
+    raw = request.args.get('w', str(default_width))
+    try:
+        width = int(raw)
+    except ValueError:
+        width = 0
+    if not 1 <= width <= MAX_IMAGE_WIDTH:
+        abort(400, description=f'w must be an integer from 1 to {MAX_IMAGE_WIDTH}')
+    upstream = Jellyfin().stream(f'/Items/{item_id}/Images/{kind}', params={'maxWidth': width})
+    response = proxied(upstream)
+    response.headers['Cache-Control'] = IMAGE_CACHE
+    return response
+
+
+@bp.route('/cinema/films/<item_id>/poster')
+def poster(item_id):
+    return _image(item_id, 'Primary', 300)
+
+
+@bp.route('/cinema/films/<item_id>/backdrop')
+def backdrop(item_id):
+    return _image(item_id, 'Backdrop/0', 1280)
+
+
 @bp.route('/cinema/films/<item_id>/play', methods=['POST'])
 def play(item_id):
     """Ask Jellyfin how this browser can play this film.

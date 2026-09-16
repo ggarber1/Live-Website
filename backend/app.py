@@ -10,6 +10,7 @@ from werkzeug.exceptions import HTTPException
 load_dotenv()
 
 from blog.blog import bp as blog_bp
+from cinema.audit import cinema_audit_command
 from cinema.cinema import bp as cinema_bp
 from database import db
 from habits.habits import bp as habits_bp
@@ -46,6 +47,7 @@ CORS(app, origins=cors_origins())
 
 db.init_app(app)
 app.cli.add_command(scan_music_command)
+app.cli.add_command(cinema_audit_command)
 
 app.register_blueprint(blog_bp, url_prefix=API_PREFIX)
 app.register_blueprint(cinema_bp, url_prefix=API_PREFIX)
