@@ -34,11 +34,24 @@ def real_env(monkeypatch, tmp_path):
 
 @pytest.fixture
 def live_db(real_env):
+    """A reachable database whose track table is empty.
+
+    These tests scan into the real track table and wipe it on teardown, and
+    the scanner treats rows it did not create as stale. Against an indexed
+    library that either aborts every scan or deletes the index, so an occupied
+    table is a hard failure, not a skip that a summary line would hide.
+    """
     try:
         with flask_app.app_context():
-            db.fetch_all("SELECT 1")
+            occupied = db.fetch_one("SELECT COUNT(*) AS n FROM track")['n']
     except (mariadb.Error, RuntimeError) as err:
         pytest.skip(f"no database available: {err}")
+    if occupied:
+        pytest.fail(
+            f"track holds {occupied} rows; the integration suite scans into "
+            "and wipes this table. Point DB_NAME at a scratch database or "
+            "empty the table first."
+        )
     yield
     with flask_app.app_context():
         db.execute("DELETE FROM track")
