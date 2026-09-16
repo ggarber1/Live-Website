@@ -12,7 +12,7 @@ interface Queue {
   index: number
 }
 
-export default function App() {
+export default function MusicPage() {
   const [query, setQuery] = useState('')
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState<TrackPage | null>(null)
@@ -56,7 +56,7 @@ export default function App() {
 
   return (
     <>
-      <main>
+      <div className="music">
         <h1>Music</h1>
         <SearchBox onChange={search} />
         {error && <p role="alert">{error}</p>}
@@ -71,7 +71,7 @@ export default function App() {
             onPage={setOffset}
           />
         )}
-      </main>
+      </div>
       <Player track={playing} onEnded={next} />
     </>
   )

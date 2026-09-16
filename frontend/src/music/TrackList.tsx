@@ -1,5 +1,5 @@
 import type { Track } from './api'
-import { describe, formatDuration } from './format'
+import { describe, formatDuration } from '../format'
 
 interface Props {
   tracks: Track[]

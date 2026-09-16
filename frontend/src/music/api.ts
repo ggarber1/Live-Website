@@ -36,13 +36,13 @@ export async function listTracks({ q = '', offset = 0 }: ListOptions): Promise<T
   params.set('limit', String(PAGE_SIZE))
   params.set('offset', String(offset))
 
-  const res = await fetch(`${BASE}/music/tracks?${params}`)
+  const res = await fetch(`${BASE}/api/music/tracks?${params}`)
   if (!res.ok) throw new Error(await errorMessage(res))
   return res.json()
 }
 
 export function streamUrl(id: number): string {
-  return `${BASE}/music/tracks/${id}/stream`
+  return `${BASE}/api/music/tracks/${id}/stream`
 }
 
 // The API answers every error with {error}, but a proxy in front of it may

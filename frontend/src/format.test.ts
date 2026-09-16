@@ -1,5 +1,5 @@
-import { describe as describeTrack, formatDuration } from './format'
-import type { Track } from './api'
+import { describe as describeTrack, formatDate, formatDuration } from './format'
+import type { Track } from './music/api'
 
 const base: Track = {
   id: 1, title: 't', artist: null, album: null, track_no: null,
@@ -29,5 +29,11 @@ describe('describe', () => {
 
   test('is empty when both are missing', () => {
     expect(describeTrack(base)).toBe('')
+  })
+})
+
+describe('formatDate', () => {
+  test('renders the API timestamp as a readable date', () => {
+    expect(formatDate('Tue, 15 Sep 2026 20:47:44 GMT')).toBe('15 September 2026')
   })
 })

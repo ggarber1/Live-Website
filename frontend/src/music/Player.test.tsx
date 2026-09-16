@@ -28,7 +28,7 @@ test('with nothing to play, the audio element has no source', () => {
 test('given a track, it sets the stream as the source and plays', () => {
   render(<Player track={track(7)} onEnded={() => {}} />)
 
-  expect(audio()).toHaveAttribute('src', 'http://localhost:5000/music/tracks/7/stream')
+  expect(audio()).toHaveAttribute('src', 'http://localhost:5000/api/music/tracks/7/stream')
   expect(screen.getByText('Track 7')).toBeInTheDocument()
   expect(screen.getByText('Synth — Demo')).toBeInTheDocument()
   expect(play).toHaveBeenCalledTimes(1)
@@ -39,7 +39,7 @@ test('a different track changes the source and plays again', () => {
 
   rerender(<Player track={track(8)} onEnded={() => {}} />)
 
-  expect(audio()).toHaveAttribute('src', 'http://localhost:5000/music/tracks/8/stream')
+  expect(audio()).toHaveAttribute('src', 'http://localhost:5000/api/music/tracks/8/stream')
   expect(play).toHaveBeenCalledTimes(2)
 })
 

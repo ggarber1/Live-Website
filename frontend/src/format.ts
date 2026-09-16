@@ -1,4 +1,4 @@
-import type { Track } from './api'
+import type { Track } from './music/api'
 
 export function formatDuration(seconds: number | null): string {
   if (seconds === null) return ''
@@ -13,4 +13,12 @@ export function formatDuration(seconds: number | null): string {
 // The artist/album line under a title. Untagged tracks have neither.
 export function describe(track: Track): string {
   return [track.artist, track.album].filter(Boolean).join(' — ')
+}
+
+// created_at arrives as an RFC 1123 string from Flask's jsonify. Rendered in
+// UTC so the date does not shift with the viewer's timezone.
+export function formatDate(rfc1123: string): string {
+  return new Date(rfc1123).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
 }

@@ -23,7 +23,7 @@ describe('listTracks', () => {
     const result = await listTracks({ q: 'tone', offset: 50 })
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:5000/music/tracks?q=tone&limit=50&offset=50',
+      'http://localhost:5000/api/music/tracks?q=tone&limit=50&offset=50',
     )
     expect(result).toEqual(page)
   })
@@ -35,7 +35,7 @@ describe('listTracks', () => {
     await listTracks({})
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:5000/music/tracks?limit=50&offset=0',
+      'http://localhost:5000/api/music/tracks?limit=50&offset=0',
     )
   })
 
@@ -58,5 +58,5 @@ describe('listTracks', () => {
 })
 
 test('streamUrl points at the track stream', () => {
-  expect(streamUrl(7)).toBe('http://localhost:5000/music/tracks/7/stream')
+  expect(streamUrl(7)).toBe('http://localhost:5000/api/music/tracks/7/stream')
 })

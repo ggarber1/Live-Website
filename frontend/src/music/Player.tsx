@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { streamUrl, type Track } from './api'
-import { describe } from './format'
+import { describe } from '../format'
 
 interface Props {
   track: Track | null

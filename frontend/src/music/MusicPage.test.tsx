@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import App from './App'
+import MusicPage from './MusicPage'
 import type { Track, TrackPage } from './api'
 import { listTracks } from './api'
 
@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 test('loads the first page on mount', async () => {
-  render(<App />)
+  render(<MusicPage />)
 
   expect(await screen.findByText('Track 1')).toBeInTheDocument()
   expect(mockList).toHaveBeenCalledWith({ q: '', offset: 0 })
@@ -43,7 +43,7 @@ test('loads the first page on mount', async () => {
 
 test('searching resets to the first page', async () => {
   mockList.mockResolvedValue(page(three, 120))
-  render(<App />)
+  render(<MusicPage />)
   await screen.findByText('Track 1')
 
   await userEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -54,17 +54,17 @@ test('searching resets to the first page', async () => {
 })
 
 test('clicking a row plays it', async () => {
-  render(<App />)
+  render(<MusicPage />)
   await userEvent.click(await screen.findByText('Track 2'))
 
   expect(player().getByText('Track 2')).toBeInTheDocument()
   expect(document.querySelector('audio')).toHaveAttribute(
-    'src', 'http://localhost:5000/music/tracks/2/stream',
+    'src', 'http://localhost:5000/api/music/tracks/2/stream',
   )
 })
 
 test('when a track ends, the next one from the list it was clicked in plays', async () => {
-  render(<App />)
+  render(<MusicPage />)
   await userEvent.click(await screen.findByText('Track 1'))
 
   // The list changes underneath the player; the queue must not.
@@ -78,7 +78,7 @@ test('when a track ends, the next one from the list it was clicked in plays', as
 })
 
 test('the last track ending leaves it in the player rather than looping', async () => {
-  render(<App />)
+  render(<MusicPage />)
   await userEvent.click(await screen.findByText('Track 3'))
 
   fireEvent.ended(document.querySelector('audio')!)
@@ -87,7 +87,7 @@ test('the last track ending leaves it in the player rather than looping', async 
 })
 
 test('a failed request shows the error and keeps the last good page', async () => {
-  render(<App />)
+  render(<MusicPage />)
   await screen.findByText('Track 1')
 
   mockList.mockRejectedValue(new Error('limit must be a positive integer'))

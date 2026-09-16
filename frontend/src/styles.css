@@ -1,62 +1,293 @@
+/* Design language: docs/superpowers/plans/2026-09-15-site-ui.md.
+   A well-kept paper planner. One look; paper has no dark mode. */
+
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  --fg: #1a1a1a;
-  --bg: #fafafa;
-  --muted: #666;
-  --line: #ddd;
-  --accent: #2b6cb0;
-  --accent-bg: #e6f0fa;
+  --paper: #f7f2e9;
+  --paper-2: #efe7da;
+  --ink: #33292e;
+  --ink-soft: #7a6e74;
+  --rule: #d9cfc4;
+  --lavender: #d9c9ef;
+  --lavender-deep: #7b62a8;
+  --rose: #c9868a;
+
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --body: 'Lora', Georgia, 'Times New Roman', serif;
+  --ease: 150ms ease;
+
+  color-scheme: light;
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--paper);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #eee;
-    --bg: #161616;
-    --muted: #999;
-    --line: #333;
-    --accent: #7ab4f5;
-    --accent-bg: #1e2a3a;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  color: var(--fg);
-  background: var(--bg);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+a {
+  color: var(--lavender-deep);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+/* ---------------------------------------------------------------- type */
+
+h1, h2, h3 {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 96;
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+}
+
+.subtitle {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin: 0 0 1.5rem;
+}
+
+.ornament {
+  color: var(--lavender-deep);
+}
+
+/* ------------------------------------------------------------- layout */
+
+.masthead {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-name {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.6rem;
+  color: var(--ink);
+  text-decoration: none;
+  padding-bottom: 0.6rem;
+}
+
+.masthead nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+}
+
+.masthead nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.25rem 0 0.6rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--ease), border-color var(--ease);
+}
+
+.masthead nav a:hover {
+  color: var(--ink);
+}
+
+.masthead nav a[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--lavender-deep);
 }
 
 main {
   max-width: 48rem;
   margin: 0 auto;
-  /* Room for the fixed player so the last row is never hidden under it. */
-  padding: 1rem 1rem 7rem;
+  padding: 2rem 1rem 3rem;
 }
 
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.75rem;
-}
+/* --------------------------------------------------------- components */
 
-input[type="search"] {
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
+.card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
   border-radius: 6px;
-  background: transparent;
+  box-shadow: 2px 2px 0 var(--lavender);
+  padding: 1rem 1.25rem;
+}
+
+.card-link {
+  display: block;
   color: inherit;
-  margin-bottom: 1rem;
+  text-decoration: none;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.card-link:hover {
+  background: var(--lavender);
+  border-color: var(--lavender-deep);
+}
+
+.card-link h2 {
+  margin-bottom: 0.15rem;
+}
+
+.card-link p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--lavender);
+  border-color: var(--lavender-deep);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--lavender-deep);
+  border-color: var(--lavender-deep);
+  color: var(--paper);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn-danger {
+  color: var(--rose);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--rose);
+}
+
+.field {
+  font: inherit;
+  width: 100%;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.field:focus,
+.btn:focus-visible,
+.masthead nav a:focus-visible {
+  outline: none;
+  border-color: var(--lavender-deep);
+  box-shadow: 0 0 0 3px var(--lavender);
+}
+
+.field::placeholder {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0.75rem;
+  font-family: var(--display);
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.rule-label::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--rule);
 }
 
 [role="alert"] {
-  color: #b91c1c;
+  color: var(--rose);
+  font-style: italic;
   margin: 0 0 1rem;
 }
 
 .empty {
-  color: var(--muted);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.empty::before {
+  content: '❦  ';
+  color: var(--lavender-deep);
+  font-style: normal;
+}
+
+/* -------------------------------------------------------------- music */
+
+.music {
+  padding-bottom: 6rem; /* room for the player */
+}
+
+input[type="search"] {
+  font: inherit;
+  width: 100%;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+input[type="search"]:focus {
+  outline: none;
+  border-color: var(--lavender-deep);
+  box-shadow: 0 0 0 3px var(--lavender);
+}
+
+input[type="search"]::placeholder {
+  color: var(--ink-soft);
+  font-style: italic;
 }
 
 table.tracks {
@@ -66,33 +297,32 @@ table.tracks {
 
 table.tracks th {
   text-align: left;
-  font-weight: 600;
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: 0 0.5rem 0.5rem;
-  border-bottom: 1px solid var(--line);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-soft);
+  padding: 0 0.5rem 0.4rem;
+  border-bottom: 1px solid var(--rule);
 }
 
 table.tracks td {
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--line);
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--rule);
   vertical-align: top;
 }
 
 table.tracks tbody tr {
   cursor: pointer;
+  transition: background var(--ease);
 }
 
-table.tracks tbody tr:hover {
-  background: var(--accent-bg);
-}
-
+table.tracks tbody tr:hover,
 table.tracks tr[aria-current="true"] {
-  background: var(--accent-bg);
+  background: var(--lavender);
 }
 
 table.tracks tr[aria-current="true"] .title {
-  color: var(--accent);
+  color: var(--lavender-deep);
   font-weight: 600;
 }
 
@@ -104,13 +334,13 @@ button.title {
   padding: 0;
   text-align: left;
   cursor: pointer;
-  /* Long filename-derived titles must wrap, not push the table wider. */
   overflow-wrap: anywhere;
 }
 
 .describe {
-  color: var(--muted);
-  font-size: 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-style: italic;
   overflow-wrap: anywhere;
 }
 
@@ -118,7 +348,7 @@ button.title {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .pager {
@@ -127,21 +357,30 @@ button.title {
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 0;
-  color: var(--muted);
+  color: var(--ink-soft);
+  font-style: italic;
 }
 
 .pager button {
   font: inherit;
-  padding: 0.4rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  font-style: normal;
+  font-size: 0.95rem;
+  color: var(--ink);
   background: transparent;
-  color: inherit;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
   cursor: pointer;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.pager button:hover:not(:disabled) {
+  background: var(--lavender);
+  border-color: var(--lavender-deep);
 }
 
 .pager button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -153,11 +392,11 @@ button.title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1rem;
+  gap: 0.5rem 1.25rem;
   padding: 0.75rem 1rem;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  background: var(--bg);
-  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+  border-top: 1px solid var(--rule);
 }
 
 .player .now-playing {
@@ -166,6 +405,7 @@ button.title {
 }
 
 .player .title {
+  font-family: var(--display);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
