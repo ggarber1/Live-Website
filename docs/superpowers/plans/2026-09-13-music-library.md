@@ -12,13 +12,20 @@ Spec: `docs/superpowers/specs/2026-09-09-media-library-design.md`
 
 ---
 
-## START HERE — handoff, 2026-09-15
+## START HERE — handoff, 2026-09-15 (evening)
 
-**Phase 1 is functionally complete. Tasks 1-12 are done; Task 13 (manual
-end-to-end verification) is the only one left, and its section near the bottom
-of this file has been rewritten with correct expectations.**
+**All 13 tasks are done, including the manual verification.** Task 13 ran
+against a real mp3: every expected output matched, seeking worked in a
+browser. The UI that the spec lists in Phase 1 scope was never in this plan;
+it has its own: `docs/superpowers/plans/2026-09-15-music-ui.md`.
 
-Branch `feat/music-library`, 37 commits ahead of `main`, nothing uncommitted.
+Since the morning handoff: the integration fixture refuses to run against an
+occupied `track` table (it used to wipe it); the listing sort has a composite
+index that must list `id` explicitly or MySQL ignores it; WAV ID3 tags are
+read; the old `services/` serverless prototypes are deleted. The two known
+gaps below are therefore one: search is still single-term.
+
+Branch `feat/music-library`, pushed, nothing uncommitted.
 
 ```bash
 cd backend
@@ -28,18 +35,20 @@ cd backend
 
 ### Do this first
 
-**`MUSIC_DIR` is not set in `backend/.env`.** Tests supply their own value, so
-nothing caught it, but the app cannot serve music without it. Add a real
-absolute path before running Task 13.
+**`MUSIC_DIR` in `backend/.env` is a placeholder (`/tmp/livs-music`).** Point
+it at the real library before deploying.
 
 ### Known gaps, deliberately not done
 
 Neither is a defect; both are recorded rather than forgotten.
 
-- **No index on the sort columns.** `ORDER BY artist, album, track_no, title, id`
-  cannot use an index, so every listing request filesorts the whole matched set.
-  Fine at thousands of rows on a Pi; matters in the tens of thousands. The fix
-  is a composite index, not keyset pagination.
+- **Deep offsets still filesort.** The `track_listing` index makes page 1 an
+  index walk (0.2 ms vs 23 ms at 50k rows), but at offset 40000 the optimizer
+  prefers a scan because the row lookups cost more than the sort. Keyset
+  pagination would fix it; nobody pages to 40000.
+- **A tag-reader change does not reach existing rows.** The incremental scan
+  skips files whose size and mtime are unchanged. Touch the files or delete
+  the rows; a `--rescan-tags` flag would be the proper fix.
 - **Search is single-term substring.** `?q=beach house depression` matches
   nothing, because no single column holds all three words. This is exactly what
   the design spec specifies; a later task could split on whitespace or add a
@@ -975,7 +984,7 @@ every row in the library — a consequence no stub can observe.
 
 ---
 
-### Task 13: Manual verification end to end — THE ONLY TASK REMAINING
+### Task 13: Manual verification end to end — DONE 2026-09-15
 
 **Files:** none. Verification only.
 
