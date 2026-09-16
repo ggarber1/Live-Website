@@ -1,0 +1,468 @@
+{
+    "Items": [
+        {
+            "Name": "The Lavender Hill Mob",
+            "ServerId": "9f8c58b05a3f45b98f4e0cc080cd433c",
+            "Id": "484e8aadade8d2c53036e3ec4b8c65e6",
+            "Container": "mkv",
+            "PremiereDate": "1951-06-28T07:00:00.0000000Z",
+            "MediaSources": [
+                {
+                    "Protocol": "File",
+                    "Id": "484e8aadade8d2c53036e3ec4b8c65e6",
+                    "Path": "/private/tmp/claude-501/-Users-ggarb-Desktop-personal-livs-website/6deb12e4-6ea8-4435-a045-43b675a91757/scratchpad/films/The Lavender Hill Mob (1951)/The Lavender Hill Mob (1951).mkv",
+                    "Type": "Default",
+                    "Container": "mkv",
+                    "Size": 9614548,
+                    "Name": "The Lavender Hill Mob (1951)",
+                    "IsRemote": false,
+                    "ETag": "0c9246e28184cdd7522ac9c54b230ac6",
+                    "RunTimeTicks": 450050000,
+                    "ReadAtNativeFramerate": false,
+                    "IgnoreDts": false,
+                    "IgnoreIndex": false,
+                    "GenPtsInput": false,
+                    "SupportsTranscoding": true,
+                    "SupportsDirectStream": true,
+                    "SupportsDirectPlay": true,
+                    "IsInfiniteStream": false,
+                    "UseMostCompatibleTranscodingProfile": false,
+                    "RequiresOpening": false,
+                    "RequiresClosing": false,
+                    "RequiresLooping": false,
+                    "SupportsProbing": true,
+                    "VideoType": "VideoFile",
+                    "MediaStreams": [
+                        {
+                            "Codec": "hevc",
+                            "TimeBase": "1/1000",
+                            "VideoRange": "SDR",
+                            "VideoRangeType": "SDR",
+                            "AudioSpatialFormat": "None",
+                            "DisplayTitle": "720p HEVC SDR",
+                            "IsInterlaced": false,
+                            "BitRate": 1581063,
+                            "BitDepth": 8,
+                            "RefFrames": 1,
+                            "IsDefault": false,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Height": 720,
+                            "Width": 1280,
+                            "AverageFrameRate": 24,
+                            "RealFrameRate": 24,
+                            "ReferenceFrameRate": 24,
+                            "Profile": "Main",
+                            "Type": "Video",
+                            "AspectRatio": "16:9",
+                            "Index": 0,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false,
+                            "PixelFormat": "yuv420p",
+                            "Level": 93,
+                            "IsAnamorphic": false
+                        },
+                        {
+                            "Codec": "ac3",
+                            "TimeBase": "1/1000",
+                            "VideoRange": "Unknown",
+                            "VideoRangeType": "Unknown",
+                            "AudioSpatialFormat": "None",
+                            "LocalizedDefault": "Default",
+                            "LocalizedExternal": "External",
+                            "LocalizedOriginal": "Original",
+                            "DisplayTitle": "Dolby Digital - Mono",
+                            "IsInterlaced": false,
+                            "ChannelLayout": "mono",
+                            "BitRate": 128000,
+                            "Channels": 1,
+                            "SampleRate": 48000,
+                            "IsDefault": false,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Type": "Audio",
+                            "Index": 1,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false
+                        }
+                    ],
+                    "MediaAttachments": [],
+                    "Formats": [],
+                    "Bitrate": 1709063,
+                    "RequiredHttpHeaders": {},
+                    "TranscodingSubProtocol": "http",
+                    "HasSegments": false
+                }
+            ],
+            "CriticRating": 100,
+            "OfficialRating": "GB-U",
+            "ChannelId": null,
+            "Overview": "A meek bank clerk who oversees the shipments of bullion joins with an eccentric neighbor to steal gold bars and smuggle them out of the country.",
+            "Genres": [
+                "Comedy",
+                "Crime"
+            ],
+            "CommunityRating": 7.2,
+            "RunTimeTicks": 450050000,
+            "ProductionYear": 1951,
+            "IsFolder": false,
+            "Type": "Movie",
+            "GenreItems": [
+                {
+                    "Name": "Comedy",
+                    "Id": "08d31605d366d63a7a924f944b4417f1"
+                },
+                {
+                    "Name": "Crime",
+                    "Id": "83a9dab21914792744c8fb23b9925dc6"
+                }
+            ],
+            "VideoType": "VideoFile",
+            "ImageTags": {
+                "Primary": "0924a93674e7c6a56420e82df6415387",
+                "Logo": "8e6c677083c0b94c01c2558a0377687b",
+                "Thumb": "bceed8968429995899c4e1f147d09a30"
+            },
+            "BackdropImageTags": [
+                "ca2fcbbc18a3aaac634275399708ebe6"
+            ],
+            "ImageBlurHashes": {
+                "Backdrop": {
+                    "ca2fcbbc18a3aaac634275399708ebe6": "W59aBQ~q009Fxu-;~q_3t74nIUxuD%xuayoffQ%MxuWBIUt7%M-;"
+                },
+                "Primary": {
+                    "0924a93674e7c6a56420e82df6415387": "dFFhJR?HN5Rt?Ko#D%RiShWXaxWT$-oLxas;IpNHRjoc"
+                },
+                "Logo": {
+                    "8e6c677083c0b94c01c2558a0377687b": "H797x0~U$_S7IxD%-n-;9a_3oexvoct7t9xaoIWZ"
+                },
+                "Thumb": {
+                    "bceed8968429995899c4e1f147d09a30": "WKEn;|xGs=tAohxb^ns;R*oMR%ofE1j]WUR%WAs:-Yodofa$t7jv"
+                }
+            },
+            "LocationType": "FileSystem",
+            "MediaType": "Video",
+            "OriginalLanguage": "en"
+        },
+        {
+            "Name": "Paper Moon",
+            "ServerId": "9f8c58b05a3f45b98f4e0cc080cd433c",
+            "Id": "a9c6c7c6a3a9e76c9fa4fb4d2864f591",
+            "Container": "mkv",
+            "PremiereDate": "1973-05-09T07:00:00.0000000Z",
+            "MediaSources": [
+                {
+                    "Protocol": "File",
+                    "Id": "a9c6c7c6a3a9e76c9fa4fb4d2864f591",
+                    "Path": "/private/tmp/claude-501/-Users-ggarb-Desktop-personal-livs-website/6deb12e4-6ea8-4435-a045-43b675a91757/scratchpad/films/Paper Moon (1973)/Paper Moon (1973).mkv",
+                    "Type": "Default",
+                    "Container": "mkv",
+                    "Size": 27321891,
+                    "Name": "Paper Moon (1973)",
+                    "IsRemote": false,
+                    "ETag": "5c5c0c2ac7c04a0017d46a75e0f3bec9",
+                    "RunTimeTicks": 450050000,
+                    "ReadAtNativeFramerate": false,
+                    "IgnoreDts": false,
+                    "IgnoreIndex": false,
+                    "GenPtsInput": false,
+                    "SupportsTranscoding": true,
+                    "SupportsDirectStream": true,
+                    "SupportsDirectPlay": true,
+                    "IsInfiniteStream": false,
+                    "UseMostCompatibleTranscodingProfile": false,
+                    "RequiresOpening": false,
+                    "RequiresClosing": false,
+                    "RequiresLooping": false,
+                    "SupportsProbing": true,
+                    "VideoType": "VideoFile",
+                    "MediaStreams": [
+                        {
+                            "Codec": "h264",
+                            "TimeBase": "1/1000",
+                            "VideoRange": "SDR",
+                            "VideoRangeType": "SDR",
+                            "AudioSpatialFormat": "None",
+                            "DisplayTitle": "720p H264 SDR",
+                            "NalLengthSize": "4",
+                            "IsInterlaced": false,
+                            "IsAVC": true,
+                            "BitRate": 4728685,
+                            "BitDepth": 8,
+                            "RefFrames": 1,
+                            "IsDefault": false,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Height": 720,
+                            "Width": 1280,
+                            "AverageFrameRate": 24,
+                            "RealFrameRate": 24,
+                            "ReferenceFrameRate": 24,
+                            "Profile": "Constrained Baseline",
+                            "Type": "Video",
+                            "AspectRatio": "16:9",
+                            "Index": 0,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false,
+                            "PixelFormat": "yuv420p",
+                            "Level": 31,
+                            "IsAnamorphic": false
+                        },
+                        {
+                            "Codec": "ac3",
+                            "TimeBase": "1/1000",
+                            "VideoRange": "Unknown",
+                            "VideoRangeType": "Unknown",
+                            "AudioSpatialFormat": "None",
+                            "LocalizedDefault": "Default",
+                            "LocalizedExternal": "External",
+                            "LocalizedOriginal": "Original",
+                            "DisplayTitle": "Dolby Digital - Mono",
+                            "IsInterlaced": false,
+                            "ChannelLayout": "mono",
+                            "BitRate": 128000,
+                            "Channels": 1,
+                            "SampleRate": 48000,
+                            "IsDefault": false,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Type": "Audio",
+                            "Index": 1,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false
+                        }
+                    ],
+                    "MediaAttachments": [],
+                    "Formats": [],
+                    "Bitrate": 4856685,
+                    "RequiredHttpHeaders": {},
+                    "TranscodingSubProtocol": "http",
+                    "HasSegments": false
+                }
+            ],
+            "CriticRating": 91,
+            "OfficialRating": "GB-PG",
+            "ChannelId": null,
+            "Overview": "During the Great Depression, a con man finds himself saddled with a young girl who may or may not be his daughter, and the two forge an unlikely partnership.",
+            "Genres": [
+                "Comedy",
+                "Crime",
+                "Drama"
+            ],
+            "CommunityRating": 7.866,
+            "RunTimeTicks": 450050000,
+            "ProductionYear": 1973,
+            "IsFolder": false,
+            "Type": "Movie",
+            "GenreItems": [
+                {
+                    "Name": "Comedy",
+                    "Id": "08d31605d366d63a7a924f944b4417f1"
+                },
+                {
+                    "Name": "Crime",
+                    "Id": "83a9dab21914792744c8fb23b9925dc6"
+                },
+                {
+                    "Name": "Drama",
+                    "Id": "090eac6e9de4fe1fbc194e5b96691277"
+                }
+            ],
+            "VideoType": "VideoFile",
+            "ImageTags": {
+                "Primary": "0300269ed8b7235bb42cdc57ca9c1ebb",
+                "Thumb": "9c57ee488786899fc7955d1ff71cabdc",
+                "Logo": "cbf4a71cd2f759326de53391fc7fa83e"
+            },
+            "BackdropImageTags": [
+                "f58f371fafbdd87afc0e5c1c759fdb41"
+            ],
+            "ImageBlurHashes": {
+                "Backdrop": {
+                    "f58f371fafbdd87afc0e5c1c759fdb41": "WTIY5?D%4n~q9Fof_3Rjt7xuD%?bRjt7t7IUayxu-;ofRjofj[WB"
+                },
+                "Primary": {
+                    "0300269ed8b7235bb42cdc57ca9c1ebb": "dSDSa,M{Iq%gNIR*xZn$9a%MjEM{~V%2IptRRjM|xuax"
+                },
+                "Thumb": {
+                    "9c57ee488786899fc7955d1ff71cabdc": "WLBM_wItx]xG4oW?xwt7xtM|WBWA01adV@bc-pxuM~D*Io-:t6%M"
+                },
+                "Logo": {
+                    "cbf4a71cd2f759326de53391fc7fa83e": "H7FiSZ?X_1jv9OIrtSIZIc~nxtxsaykCM|oextt5"
+                }
+            },
+            "LocationType": "FileSystem",
+            "MediaType": "Video",
+            "OriginalLanguage": "en"
+        },
+        {
+            "Name": "Roman Holiday",
+            "ServerId": "9f8c58b05a3f45b98f4e0cc080cd433c",
+            "Id": "19881abd403a19cbb77d6edea8d3a40a",
+            "Container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "PremiereDate": "1953-08-26T07:00:00.0000000Z",
+            "MediaSources": [
+                {
+                    "Protocol": "File",
+                    "Id": "19881abd403a19cbb77d6edea8d3a40a",
+                    "Path": "/private/tmp/claude-501/-Users-ggarb-Desktop-personal-livs-website/6deb12e4-6ea8-4435-a045-43b675a91757/scratchpad/films/Roman Holiday (1953)/Roman Holiday (1953).mp4",
+                    "Type": "Default",
+                    "Container": "mp4",
+                    "Size": 27327104,
+                    "Name": "Roman Holiday (1953)",
+                    "IsRemote": false,
+                    "ETag": "bf68e60b1138aa57977b77c574e78da2",
+                    "RunTimeTicks": 450000000,
+                    "ReadAtNativeFramerate": false,
+                    "IgnoreDts": false,
+                    "IgnoreIndex": false,
+                    "GenPtsInput": false,
+                    "SupportsTranscoding": true,
+                    "SupportsDirectStream": true,
+                    "SupportsDirectPlay": true,
+                    "IsInfiniteStream": false,
+                    "UseMostCompatibleTranscodingProfile": false,
+                    "RequiresOpening": false,
+                    "RequiresClosing": false,
+                    "RequiresLooping": false,
+                    "SupportsProbing": true,
+                    "VideoType": "VideoFile",
+                    "MediaStreams": [
+                        {
+                            "Codec": "h264",
+                            "Language": "und",
+                            "TimeBase": "1/12288",
+                            "VideoRange": "SDR",
+                            "VideoRangeType": "SDR",
+                            "AudioSpatialFormat": "None",
+                            "DisplayTitle": "720p H264 SDR",
+                            "NalLengthSize": "4",
+                            "IsInterlaced": false,
+                            "IsAVC": true,
+                            "BitRate": 4725672,
+                            "BitDepth": 8,
+                            "RefFrames": 1,
+                            "IsDefault": true,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Height": 720,
+                            "Width": 1280,
+                            "AverageFrameRate": 24,
+                            "RealFrameRate": 24,
+                            "ReferenceFrameRate": 24,
+                            "Profile": "Constrained Baseline",
+                            "Type": "Video",
+                            "AspectRatio": "16:9",
+                            "Index": 0,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false,
+                            "PixelFormat": "yuv420p",
+                            "Level": 31,
+                            "IsAnamorphic": false
+                        },
+                        {
+                            "Codec": "aac",
+                            "Language": "und",
+                            "TimeBase": "1/48000",
+                            "VideoRange": "Unknown",
+                            "VideoRangeType": "Unknown",
+                            "AudioSpatialFormat": "None",
+                            "LocalizedDefault": "Default",
+                            "LocalizedExternal": "External",
+                            "LocalizedLanguage": "Undetermined",
+                            "LocalizedOriginal": "Original",
+                            "DisplayTitle": "AAC - Mono - Default",
+                            "IsInterlaced": false,
+                            "ChannelLayout": "mono",
+                            "BitRate": 128137,
+                            "Channels": 1,
+                            "SampleRate": 48000,
+                            "IsDefault": true,
+                            "IsForced": false,
+                            "IsHearingImpaired": false,
+                            "IsOriginal": false,
+                            "Profile": "LC",
+                            "Type": "Audio",
+                            "Index": 1,
+                            "IsExternal": false,
+                            "IsTextSubtitleStream": false,
+                            "SupportsExternalStream": false
+                        }
+                    ],
+                    "MediaAttachments": [],
+                    "Formats": [],
+                    "Bitrate": 4858151,
+                    "RequiredHttpHeaders": {},
+                    "TranscodingSubProtocol": "http",
+                    "HasSegments": false
+                }
+            ],
+            "CriticRating": 97,
+            "OfficialRating": "GB-U",
+            "ChannelId": null,
+            "Overview": "Overwhelmed by her suffocating schedule, touring European princess Ann takes off for a night while in Rome. When a sedative she took from her doctor kicks in, however, she falls asleep on a park bench and is found by an American reporter, Joe Bradley, who takes her back to his apartment for safety. At work the next morning, Joe finds out Ann's regal identity and bets his editor he can get exclusive interview with her, but romance soon gets in the way.",
+            "Genres": [
+                "Romance",
+                "Comedy",
+                "Drama"
+            ],
+            "CommunityRating": 7.891,
+            "RunTimeTicks": 450000000,
+            "ProductionYear": 1953,
+            "IsFolder": false,
+            "Type": "Movie",
+            "GenreItems": [
+                {
+                    "Name": "Romance",
+                    "Id": "1ffc72e19987e5fa4047c6a6870646cf"
+                },
+                {
+                    "Name": "Comedy",
+                    "Id": "08d31605d366d63a7a924f944b4417f1"
+                },
+                {
+                    "Name": "Drama",
+                    "Id": "090eac6e9de4fe1fbc194e5b96691277"
+                }
+            ],
+            "VideoType": "VideoFile",
+            "ImageTags": {
+                "Thumb": "594aff5edfaea783efda2fbe51e2ac17",
+                "Primary": "fe946a437baefd90836313e70853e724",
+                "Logo": "339ea614f0bc5a5fee4bf607acc2de30"
+            },
+            "BackdropImageTags": [
+                "a856cf85a27999f12cf92574d91d637e"
+            ],
+            "ImageBlurHashes": {
+                "Backdrop": {
+                    "a856cf85a27999f12cf92574d91d637e": "WwKTi3H@xZt7o0xa~VIUNHs:kCof%MadRkoIkDWV%MV@jZozV@fl"
+                },
+                "Thumb": {
+                    "594aff5edfaea783efda2fbe51e2ac17": "Wj9bRjDNx^R-adt7Rjn%o#aJa}X9RPozWBjYozaeg4jEkBa#j?WB"
+                },
+                "Primary": {
+                    "fe946a437baefd90836313e70853e724": "dKAoT$56mlsrqth|Ioo}Dh.TW?S~R.pIVYmlR6e9o{g3"
+                },
+                "Logo": {
+                    "339ea614f0bc5a5fee4bf607acc2de30": "O87_4mRjofaeRjofRPof?bofofRjt7ay00xu%Mj[%Mayt7"
+                }
+            },
+            "LocationType": "FileSystem",
+            "MediaType": "Video",
+            "OriginalLanguage": "en"
+        }
+    ],
+    "TotalRecordCount": 3,
+    "StartIndex": 0
+}
