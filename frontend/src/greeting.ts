@@ -47,6 +47,14 @@ export function dateLine(now: Date): string {
   return `It's ${weekday}, ${day} ${month}.`
 }
 
+// Liv's birthday: 27 September. That day the note is not on the rota.
+const BIRTHDAY = { month: 8, day: 27 } // months are zero-based
+
+export function isBirthday(now: Date): boolean {
+  return now.getMonth() === BIRTHDAY.month && now.getDate() === BIRTHDAY.day
+}
+
 export function noteOfTheDay(now: Date): string {
+  if (isBirthday(now)) return 'Happy Birthdayyy!!!'
   return LINES[dayOfYear(now) % LINES.length]
 }
