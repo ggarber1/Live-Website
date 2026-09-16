@@ -1,7 +1,7 @@
 # Media library design — music and cinema
 
 Date: 2026-09-09
-Status: phase 1 specified, phases 2 and 3 outlined
+Status: phases 1 and 2 specified, phase 3 outlined
 
 ## Problem
 
@@ -196,7 +196,7 @@ playlists become a later addition inside that module.
 
 ## Phase 2 — Cinema, LAN only
 
-Not specified in detail; to be brainstormed when phase 1 lands.
+Specified 2026-09-16 in `2026-09-16-cinema-design.md`, after measuring Jellyfin 12.1.0 locally. The paragraphs below are the original outline and still hold, with one change: playback happens inside our own page (hls.js against a Flask proxy), not by handing off to Jellyfin's player.
 
 Torrented video is almost always `.mkv` with AC3, E-AC3 or DTS audio, none of
 which browsers can play, and increasingly x265 video. Direct play is therefore
