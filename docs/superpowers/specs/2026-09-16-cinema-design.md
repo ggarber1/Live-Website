@@ -6,7 +6,7 @@ Status: specified 2026-09-16, against Jellyfin 12.1.0 running locally. Parent: `
 
 Films only, on the LAN, played inside our own page. Jellyfin owns the library; we own the look. Greg chose "play inside our page" over handing off to Jellyfin's player, and "films only" over films plus TV.
 
-Out of scope, deliberately: TV series, subtitles (see Gaps), resume and watched state, ratings or notes of our own, public access. Nothing in this phase writes to Jellyfin or to the media files.
+Out of scope, deliberately: TV series, subtitles (see Gaps), ratings or notes of our own, public access. (Resume was added the same day; see below.) Nothing in this phase writes to Jellyfin or to the media files.
 
 ## Two kinds of truth, again
 
@@ -91,6 +91,10 @@ Route `/cinema`, nav label "Cinema", in the paper language.
 - **Player.** Same page, replacing the poster area with a `<video controls>` at 16:9, fullscreen via the native controls. `kind: "direct"` sets `src`; `kind: "hls"` attaches hls.js (or sets `src` on Safari). On unmount, route change or `pagehide`, POST the stop endpoint via `sendBeacon`. Errors from hls.js surface as one line under the video, not a modal.
 - **Music and cinema do not play at once.** Pressing Play on a film pauses the music player if it is playing. The reverse is not needed; a film page unmounts its player when you leave.
 
+## Resume (added 2026-09-16, the day Greg asked)
+
+The position is Jellyfin's per-user data, written with `POST /UserItems/{id}/UserData?userId=..` `{PlaybackPositionTicks, Played}` and read back as `UserData` on any item fetched with `userId`. `POST /api/cinema/films/<id>/position {seconds, finished}` wraps it. The player reports on pause, every 30 s, and on leaving (by beacon); `ended` sends `finished`, which clears the position and marks the film played. The film page offers "Resume from <time>" and "Start over" when more than 30 s is stored and the film is not played. Jellyfin's own apps see the same position.
+
 ## CLI: `flask --app app cinema-audit`
 
 Lists every film whose video codec is not h264, with its container and audio codec. This is the spec's "favour x264 releases" advice made checkable: run it after adding files, before the film night. Exit 0 always; it is a report, not a gate.
@@ -115,7 +119,6 @@ Jellyfin from the official apt repository, bound to `127.0.0.1:8096` and `[::1]`
 ## Gaps, recorded
 
 - **Subtitles.** Jellyfin serves external subtitles as WebVTT at `/Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.vtt`. Proxying them and adding `<track>` elements is a contained follow-up; burned-in subtitles for image formats (PGS) mean a video transcode and are worth avoiding on the Pi.
-- **Resume and watched.** Jellyfin tracks these per user via `/Sessions/Playing/Progress`. Adding it means reporting progress every few seconds; deferred until someone misses it.
 - **Search.** The grid is one page. Jellyfin supports `searchTerm`; add when the library is big enough to need it.
 
 ## Decisions
