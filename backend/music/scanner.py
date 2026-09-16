@@ -2,11 +2,11 @@ import logging
 import os
 
 import click
-import mariadb
 from flask.cli import with_appcontext
 
 from database.db import execute, fetch_all, insert
-from library.rails import REMOVAL_FLOOR, REMOVAL_LIMIT, ScanAborted, refuse_mass_removal  # noqa: F401
+from library.rails import REMOVAL_FLOOR, REMOVAL_LIMIT, ScanAborted  # noqa: F401  (re-exported for tests and callers)
+from library.scan import find_files, run_scan_command, scan
 from music.config import MAX_PATH_LENGTH, music_dir
 from music.tags import AUDIO_EXTENSIONS, read_tags
 
@@ -29,38 +29,6 @@ UPDATE track
 """
 
 SELECT_INDEXED = "SELECT id, path, size_bytes, mtime_ns FROM track"
-
-
-def find_files(root, extensions, on_error=None):
-    """Yield every file under `root` with one of `extensions`, sorted within
-    each directory.
-
-    Dotfiles and dot directories are skipped. A drive that has been mounted on
-    a Mac carries `._name.mp3` AppleDouble stubs, which satisfy the extension
-    check while being unplayable metadata, and `.Trashes`, which can hold
-    deleted media. The photo thumbnail cache is a dot directory for the same
-    reason.
-
-    Unreadable directories are logged and passed to `on_error` rather than
-    vanishing. os.walk swallows scandir failures by default, which would let a
-    partial library look like a complete one.
-    """
-    def report(err):
-        logger.error("cannot read directory %s: %s",
-                     getattr(err, 'filename', '?'), err)
-        if on_error is not None:
-            on_error(err)
-
-    for dirpath, dirnames, filenames in os.walk(root, onerror=report):
-        # Pruned in place so os.walk does not descend into them at all.
-        # Sorted for a reproducible traversal order in logs.
-        dirnames[:] = sorted(name for name in dirnames
-                             if not name.startswith('.'))
-        for name in sorted(filenames):
-            if name.startswith('.'):
-                continue
-            if name.lower().endswith(extensions):
-                yield os.path.join(dirpath, name)
 
 
 def find_audio_files(root, on_error=None):
@@ -87,118 +55,18 @@ def _update_track(track_id, path, tags, stat):
     ))
 
 
-def _skip(counts, reason):
-    """Record a skipped file under both the rollup and its specific reason.
-
-    The three reasons need three different fixes — rename the file, repair
-    permissions, correct the tag data — so a single total is not actionable.
-    """
-    counts['skipped'] += 1
-    counts[f'skipped_{reason}'] += 1
-
-
-def _refuse_mass_removal(root, stale, indexed, found_any):
-    refuse_mass_removal(root, stale, indexed, found_any,
-                        table='track', noun='audio', variable='MUSIC_DIR')
-
-
 def scan_music(force_removals=False):
-    """Index MUSIC_DIR into the track table.
+    """Index MUSIC_DIR into the track table. See library.scan.scan.
 
-    Incremental: a file whose size and mtime_ns match the indexed row is
-    skipped without re-reading its tags, so rescanning a large library is
-    cheap. Existing rows are updated in place rather than deleted and
-    reinserted, so ids stay stable for future playlist references.
-
-    Removal only runs when the walk was complete. An unreadable directory
-    makes its files invisible, which looks exactly like them being deleted,
-    and dropping those rows would be silent data loss.
-
-    Even after a complete walk, a removal that would delete too large a
-    share of the table is refused (see `_refuse_mass_removal`) unless
-    `force_removals` is set, since an unmounted drive or a reconfigured
-    MUSIC_DIR looks identical to a genuinely emptied library.
-
-    That refusal is not atomic with respect to the writes already made in the
-    same call: each statement commits on its own, so an aborted scan leaves
-    the adds and updates in place and only the removals undone. The table is
-    a rebuildable index and a re-run finishes the job, so this is coherent —
-    but a listing will show stale rows alongside the new ones until then.
-
-    Returns counts of added, updated, unchanged, removed, skipped (a rollup),
-    skipped_too_long, skipped_unreadable, skipped_rejected and
-    unreadable_dirs.
+    The database and tag functions are looked up here at call time so the
+    tests' stubs on this module take effect.
     """
-    root = music_dir()
-    unreadable = []
-    indexed = {row['path']: row for row in fetch_all(SELECT_INDEXED)}
-    counts = {'added': 0, 'updated': 0, 'unchanged': 0, 'removed': 0,
-              'skipped': 0, 'skipped_too_long': 0, 'skipped_unreadable': 0,
-              'skipped_rejected': 0, 'unreadable_dirs': 0}
-    seen = set()
-    found_any = False
-
-    for path in find_audio_files(root, on_error=unreadable.append):
-        # Recorded the moment the walk yields it. The file demonstrably
-        # exists, so its row must survive even if we then fail to stat or to
-        # write it — deleting it would renumber the track on a later scan and
-        # orphan anything referencing the old id.
-        found_any = True
-        seen.add(path)
-        if len(path) > MAX_PATH_LENGTH:
-            # The column is VARCHAR(768). MySQL outside strict mode would
-            # truncate, storing a path that can never stream.
-            logger.error(
-                "skipping path longer than %d characters (track.path cannot "
-                "store it intact): %s", MAX_PATH_LENGTH, path)
-            _skip(counts, 'too_long')
-            continue
-        try:
-            stat = os.stat(path)
-        except OSError as err:
-            logger.error("skipping unreadable file %s: %s", path, err)
-            _skip(counts, 'unreadable')
-            continue
-
-        row = indexed.get(path)
-        if (row is not None
-                and row['size_bytes'] == stat.st_size
-                and row['mtime_ns'] == stat.st_mtime_ns):
-            counts['unchanged'] += 1
-            continue
-
-        tags = read_tags(path)
-        try:
-            if row is None:
-                _insert_track(path, tags, stat)
-                counts['added'] += 1
-            else:
-                _update_track(row['id'], path, tags, stat)
-                counts['updated'] += 1
-        except (mariadb.IntegrityError, mariadb.DataError) as err:
-            # A bad row; the next may be fine. A lost connection is
-            # OperationalError/InterfaceError and deliberately propagates.
-            logger.error("skipping %s, write rejected: %s", path, err)
-            _skip(counts, 'rejected')
-            continue
-
-    counts['unreadable_dirs'] = len(unreadable)
-
-    if unreadable:
-        logger.error(
-            "%d directories could not be read; skipping removal detection so "
-            "rows for files beneath them are not deleted", len(unreadable))
-        return counts
-
-    stale = [row for path, row in indexed.items() if path not in seen]
-    if stale and not force_removals:
-        _refuse_mass_removal(root, stale, indexed, found_any)
-
-    for row in stale:
-        execute("DELETE FROM track WHERE id = ?", (row['id'],))
-        counts['removed'] += 1
-
-    return counts
+    return scan(
+        root=music_dir(), extensions=AUDIO_EXTENSIONS, table='track',
+        noun='audio', variable='MUSIC_DIR', read=read_tags,
+        insert=_insert_track, update=_update_track,
+        fetch_all=fetch_all, execute=execute, force_removals=force_removals,
+    )
 
 
 @click.command('scan-music')
@@ -207,27 +75,4 @@ def scan_music(force_removals=False):
 @with_appcontext
 def scan_music_command(force_removals):
     """Index MUSIC_DIR into the track table."""
-    try:
-        counts = scan_music(force_removals=force_removals)
-    except ScanAborted as err:
-        raise click.ClickException(str(err))
-
-    click.echo(
-        "added {added}, updated {updated}, unchanged {unchanged}, "
-        "removed {removed}".format(**counts))
-    if counts['skipped']:
-        click.echo(
-            "skipped {skipped} (too long {skipped_too_long}, "
-            "unreadable files {skipped_unreadable}, "
-            "rejected {skipped_rejected})".format(**counts))
-
-    blocked = counts['unreadable_dirs']
-    if blocked:
-        # Removal detection was skipped, so the index is knowingly stale.
-        # Exit non-zero: this runs from a timer, and a silent partial success
-        # is exactly the failure this scanner exists to avoid.
-        raise click.ClickException(
-            f"{blocked} director{'y' if blocked == 1 else 'ies'} could not be "
-            "read, so stale rows were left in place. Fix the permissions and "
-            "re-run."
-        )
+    run_scan_command(scan_music, force_removals)
