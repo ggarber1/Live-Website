@@ -30,6 +30,9 @@ REQUESTS = [
     ('put', '/api/recipes/1', {'title': 't', 'ingredients': ['a'], 'instructions': ['b']}),
     ('delete', '/api/recipes/1', None),
     ('get', '/api/music/tracks', None),
+    ('get', '/api/photos', None),
+    ('get', '/api/photos/1', None),
+    ('put', '/api/photos/1', {'caption': 'us'}),
     # With ?q=, so the search clause is actually executed. Without it the
     # route takes the no-filter branch and the LIKE columns are never checked.
     ('get', '/api/music/tracks?q=beach', None),
@@ -232,3 +235,13 @@ def test_photo_recent_index_lists_id_explicitly():
 def test_taken_at_is_never_null():
     """The newest-first sort has one key; a null would sort unpredictably."""
     assert re.search(r'^\s*taken_at\s+DATETIME\s+NOT NULL', TABLE_DDL['photo'], re.M)
+
+
+def test_photo_recent_index_matches_the_listing_sort():
+    from photos.photos import SELECT_PAGE
+
+    order_by = re.search(r'ORDER BY (.+?) LIMIT', SELECT_PAGE).group(1)
+    sort_columns = [c.strip().split()[0] for c in order_by.split(',')]
+    index = re.search(r'INDEX photo_recent \((.+?)\)', TABLE_DDL['photo'])
+
+    assert [c.strip() for c in index.group(1).split(',')] == sort_columns

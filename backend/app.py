@@ -16,6 +16,7 @@ from database import db
 from habits.habits import bp as habits_bp
 from music.music import bp as music_bp
 from music.scanner import scan_music_command
+from photos.photos import bp as photos_bp
 from photos.scanner import scan_photos_command
 from recipes.recipes import bp as recipes_bp
 from todo.todo import bp as todo_bp
@@ -55,6 +56,7 @@ app.register_blueprint(blog_bp, url_prefix=API_PREFIX)
 app.register_blueprint(cinema_bp, url_prefix=API_PREFIX)
 app.register_blueprint(habits_bp, url_prefix=API_PREFIX)
 app.register_blueprint(music_bp, url_prefix=API_PREFIX)
+app.register_blueprint(photos_bp, url_prefix=API_PREFIX)
 app.register_blueprint(recipes_bp, url_prefix=API_PREFIX)
 app.register_blueprint(todo_bp, url_prefix=API_PREFIX)
 

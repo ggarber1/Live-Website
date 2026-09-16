@@ -3,15 +3,16 @@ import pytest
 import blog.blog
 import habits.habits
 import music.music
+import photos.photos
 import recipes.recipes
 import todo.todo
 from app import app as flask_app
 
-SERVICE_MODULES = (blog.blog, habits.habits, music.music,
+SERVICE_MODULES = (blog.blog, habits.habits, music.music, photos.photos,
                    recipes.recipes, todo.todo)
 # music is read-only; the rest import execute/insert. Keeping them separate
 # means a rename in a write-owning module still fails loudly.
-WRITE_MODULES = (blog.blog, habits.habits, recipes.recipes, todo.todo)
+WRITE_MODULES = (blog.blog, habits.habits, photos.photos, recipes.recipes, todo.todo)
 
 
 @pytest.fixture(autouse=True)
