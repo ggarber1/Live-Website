@@ -5,12 +5,13 @@
 #   scripts/make-test-films.sh <films-dir>
 set -eu
 DIR=${1:?usage: make-test-films.sh <films-dir>}
+SECONDS_EACH=${SECONDS_EACH:-45}   # longer films make resume testable
 
 mk() { # title year vcodec acodec ext
   mkdir -p "$DIR/$1 ($2)"
   ffmpeg -hide_banner -loglevel error -y \
     -f lavfi -i "testsrc2=size=1280x720:rate=24" \
-    -f lavfi -i "sine=frequency=330:sample_rate=48000" -t 45 \
+    -f lavfi -i "sine=frequency=330:sample_rate=48000" -t "$SECONDS_EACH" \
     -c:v "$3" -preset ultrafast -crf 28 -c:a "$4" -b:a 128k -metadata title="$1" \
     "$DIR/$1 ($2)/$1 ($2).$5"
   echo "made: $1 ($2)  $3 / $4 / $5"
