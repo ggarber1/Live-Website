@@ -204,3 +204,34 @@ class TestReadTagsExtraction:
         tagged({'title': ['T' * 255]})
 
         assert read_tags(str(tmp_path / 'x.mp3'))['title'] == 'T' * 255
+
+
+def test_reads_id3_tags_from_a_wav_file(tmp_path):
+    """mutagen has no easy-mode WAV class, so raw ID3 frames must be read.
+
+    Without this, every tagged .wav is indexed under its filename with no
+    artist or album, and searching for the artist finds nothing.
+    """
+    import wave
+
+    from mutagen.id3 import TALB, TIT2, TPE1, TRCK
+    from mutagen.wave import WAVE
+
+    path = tmp_path / '03 whatever.wav'
+    with wave.open(str(path), 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(8000)
+        w.writeframes(b'\0\0' * 8000)
+    audio = WAVE(str(path))
+    audio.add_tags()
+    audio['TIT2'] = TIT2(encoding=3, text='Song')
+    audio['TPE1'] = TPE1(encoding=3, text='Band')
+    audio['TALB'] = TALB(encoding=3, text='Record')
+    audio['TRCK'] = TRCK(encoding=3, text='3/10')
+    audio.save()
+
+    tags = read_tags(str(path))
+
+    assert tags == {'title': 'Song', 'artist': 'Band', 'album': 'Record',
+                    'track_no': 3, 'duration_seconds': 1}

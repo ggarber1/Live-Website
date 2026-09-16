@@ -2,6 +2,7 @@ import logging
 import os
 
 import mutagen
+import mutagen.id3
 
 AUDIO_EXTENSIONS = ('.mp3', '.flac', '.m4a', '.ogg', '.wav')
 
@@ -12,6 +13,12 @@ AUDIO_EXTENSIONS = ('.mp3', '.flac', '.m4a', '.ogg', '.wav')
 MAX_SIGNED_INT = 2147483647
 MAX_TRACK_NUMBER = 9999
 MAX_TEXT_LENGTH = 255
+
+# mutagen's easy=True covers MP3, MP4 and the Vorbis-comment formats but not
+# WAV: a tagged .wav comes back with raw ID3 frames, so the easy keys find
+# nothing and the file is indexed under its filename with no artist.
+ID3_FRAMES = {'title': 'TIT2', 'artist': 'TPE1', 'album': 'TALB',
+              'tracknumber': 'TRCK'}
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +50,19 @@ def _first(audio, key):
     scan with it. Truncating keeps a usable, searchable value where rejecting
     would lose the field entirely.
     """
-    values = audio.get(key) or []
-    for value in values:
+    for value in _values(audio, key):
         text = str(value).strip()
         if text:
             return text[:MAX_TEXT_LENGTH]
     return None
+
+
+def _values(audio, key):
+    tags = getattr(audio, 'tags', None)
+    if isinstance(tags, mutagen.id3.ID3):
+        frame = tags.get(ID3_FRAMES[key])
+        return list(frame.text) if frame is not None else []
+    return audio.get(key) or []
 
 
 def read_tags(path):
