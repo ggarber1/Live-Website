@@ -762,3 +762,172 @@ textarea.field {
     max-width: 12rem;
   }
 }
+
+/* ------------------------------------------------------------- photos */
+
+.polaroid {
+  margin: 0;
+  background: #fffdf8;
+  border: 1px solid var(--rule);
+  padding: 0.6rem 0.6rem 0.5rem;
+  box-shadow: 2px 2px 0 var(--lavender);
+  transition: box-shadow var(--ease), border-color var(--ease);
+}
+
+.polaroid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--paper-2);
+}
+
+.polaroid figcaption {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 0.95rem;
+  text-align: center;
+  padding-top: 0.55rem;
+  min-height: 1.9rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.polaroid-button,
+.polaroid-link {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.polaroid-button:hover .polaroid,
+.polaroid-link:hover .polaroid {
+  border-color: var(--lavender-deep);
+  box-shadow: 3px 3px 0 var(--lavender-deep);
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 1.25rem 1rem;
+}
+
+.photo-band {
+  margin: 0 0 2rem;
+}
+
+.photo-band-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 1rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.photo-band .polaroid figcaption {
+  font-size: 0.85rem;
+  min-height: 1.6rem;
+}
+
+.photo-band-more {
+  margin: 0.75rem 0 0;
+  text-align: right;
+  font-family: var(--display);
+  font-style: italic;
+}
+
+.upload input[type="file"] {
+  display: none;
+}
+
+.notice {
+  color: var(--ink-soft);
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(51, 41, 46, 0.85);
+}
+
+.lightbox-frame {
+  justify-self: center;
+  max-width: min(100%, 64rem);
+  max-height: 100%;
+  background: #fffdf8;
+  border: 1px solid var(--rule);
+  padding: 0.75rem;
+  box-shadow: 3px 3px 0 var(--lavender);
+}
+
+.lightbox-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 8rem);
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.lightbox-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  padding-top: 0.6rem;
+  font-family: var(--display);
+  font-style: italic;
+}
+
+.lightbox-caption .inline-text {
+  flex: 1;
+}
+
+.lightbox-caption .inline-field {
+  flex: 1;
+  font-family: var(--body);
+  font-style: normal;
+}
+
+.lightbox-nav,
+.lightbox-close {
+  font: inherit;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--paper);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.lightbox-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.75rem;
+}
+
+@media (max-width: 30rem) {
+  .lightbox {
+    grid-template-columns: 1fr;
+    padding: 2.5rem 0.5rem 0.5rem;
+  }
+  .lightbox-nav {
+    display: none;
+  }
+}

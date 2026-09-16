@@ -23,6 +23,7 @@ test('the nav links to every section', () => {
   expect(hrefs).toEqual([
     ['Music', '/music'],
     ['Cinema', '/cinema'],
+    ['Photos', '/photos'],
     ['To-do', '/todo'],
     ['Habits', '/habits'],
     ['Recipes', '/recipes'],

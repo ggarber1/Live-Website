@@ -5,6 +5,7 @@ import { PlayerProvider } from './music/queue'
 const SECTIONS: [string, string][] = [
   ['Music', '/music'],
   ['Cinema', '/cinema'],
+  ['Photos', '/photos'],
   ['To-do', '/todo'],
   ['Habits', '/habits'],
   ['Recipes', '/recipes'],

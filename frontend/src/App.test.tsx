@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import { listTracks } from './music/api'
 
+vi.mock('./photos/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./photos/api')>()),
+  listPhotos: vi.fn().mockResolvedValue({ photos: [], total: 0, limit: 6, offset: 0 }),
+}))
+
 vi.mock('./music/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./music/api')>()),
   listTracks: vi.fn().mockResolvedValue({ tracks: [], total: 0, limit: 50, offset: 0 }),

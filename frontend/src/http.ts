@@ -7,7 +7,7 @@ export const BASE = import.meta.env.VITE_API_URL ?? ''
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: init.body ? { 'Content-Type': 'application/json', ...init.headers } : init.headers,
+    headers: typeof init.body === 'string' ? { 'Content-Type': 'application/json', ...init.headers } : init.headers,
   })
   if (!res.ok) throw new Error(await errorMessage(res))
   if (res.status === 204) return undefined as T
