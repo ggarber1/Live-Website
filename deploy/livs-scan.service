@@ -1,5 +1,5 @@
 [Unit]
-Description=Index Liv's music library
+Description=Index Liv's music and photo libraries
 After=network-online.target mariadb.service
 Wants=network-online.target
 
@@ -11,7 +11,10 @@ Group=pi
 # EDIT: where the repo lives on the Pi.
 WorkingDirectory=/home/pi/livs_website/backend
 EnvironmentFile=/home/pi/livs_website/backend/.env
+# Type=oneshot runs each ExecStart in turn; a failing scan-music does not
+# stop scan-photos, since systemd only reports the unit failed at the end.
 ExecStart=/home/pi/livs_website/backend/venv/bin/flask --app app scan-music
+ExecStart=-/home/pi/livs_website/backend/venv/bin/flask --app app scan-photos
 
 NoNewPrivileges=true
 ProtectSystem=full

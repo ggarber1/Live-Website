@@ -118,6 +118,29 @@ sudo systemctl enable --now livs-scan.timer
 
 Check it: `systemctl list-timers livs-scan` and `journalctl -u livs-scan -n 50`.
 
+## 6b. Photos
+
+`PHOTOS_DIR` points at the photos subdirectory of the mount, like
+`MUSIC_DIR`. Two differences from music:
+
+- **The site writes here.** Uploads land in `PHOTOS_DIR/YYYY/MM/` and
+  deletes remove files, so the `pi` user needs write access to the
+  directory (`sudo chown -R pi:pi /mnt/media/photos`).
+- **Thumbnails are cached on the drive**, in `PHOTOS_DIR/.thumbnails/`
+  (or `PHOTOS_THUMBS_DIR`). The dot-directory is skipped by the scanner.
+  It is safe to delete; it is rebuilt on demand.
+
+Index anything copied in by hand, and index again nightly (the timer runs
+both scans):
+
+```bash
+./venv/bin/flask --app app scan-photos
+```
+
+The same safety rails as music apply: an empty directory with a populated
+table, or a scan that would remove more than half the rows, is refused
+without `--force-removals`.
+
 ## 7. Build the frontend
 
 Flask serves `frontend/dist/` on the same origin as the API, so there is no
@@ -209,6 +232,7 @@ cd /home/pi/livs_website && git pull
 ./backend/venv/bin/flask --app app init-db   # only if the schema changed
 (cd frontend && npm ci && npm run build)    # only if frontend/ changed
 ./backend/venv/bin/flask --app app cinema-audit  # after adding films
+./backend/venv/bin/flask --app app scan-photos   # after copying photos in by hand
 sudo systemctl restart livs-api
 ```
 
