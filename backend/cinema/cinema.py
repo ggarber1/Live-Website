@@ -10,6 +10,7 @@ from flask import Blueprint, Response, abort, request, stream_with_context
 
 from api import json_body
 from cinema.client import Jellyfin, JellyfinError, JellyfinNotFound, JellyfinUnavailable
+from cinema.films import LIST_FIELDS, to_film
 from cinema.playlist import strip_api_key
 from cinema.profile import DEVICE_PROFILE
 
@@ -41,6 +42,22 @@ def upstream_error(err):
     if err.status == 400:
         return {'error': 'no such film'}, 404
     return {'error': f'Jellyfin answered {err.status}'}, 502
+
+
+@bp.route('/cinema/films')
+def films():
+    """Every film Jellyfin knows, sorted by title."""
+    page = Jellyfin().get_json('/Items', params={
+        'IncludeItemTypes': 'Movie', 'Recursive': 'true',
+        'Fields': LIST_FIELDS, 'SortBy': 'SortName',
+    })
+    return [to_film(item) for item in page.get('Items', [])]
+
+
+@bp.route('/cinema/films/<item_id>')
+def film(item_id):
+    item = Jellyfin().get_json(f'/Items/{item_id}', params={'Fields': LIST_FIELDS})
+    return to_film(item)
 
 
 @bp.route('/cinema/films/<item_id>/play', methods=['POST'])

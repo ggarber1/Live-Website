@@ -44,6 +44,17 @@ class FakeJellyfin:
         if FakeJellyfin.state.get('error'):
             raise FakeJellyfin.state['error']
 
+    def get_json(self, path, params=None):
+        self._fail()
+        FakeJellyfin.state['calls'].append(('GET', path, None, params))
+        if path == '/Items':
+            return fixture('items.json')
+        wanted = path.split('/')[-1]
+        for item in fixture('items.json')['Items']:
+            if item['Id'] == wanted:
+                return item
+        raise JellyfinNotFound()
+
     def post_json(self, path, body=None, params=None):
         self._fail()
         FakeJellyfin.state['calls'].append(('POST', path, body, params))
@@ -66,6 +77,34 @@ def jellyfin(monkeypatch):
                           'upstream': FakeUpstream()}
     monkeypatch.setattr(routes, 'Jellyfin', FakeJellyfin)
     return FakeJellyfin.state
+
+
+class TestListing:
+    def test_lists_every_film_sorted_by_title(self, client, jellyfin):
+        res = client.get('/api/cinema/films')
+
+        assert res.status_code == 200
+        films = res.get_json()
+        # Jellyfin's SortName drops leading articles, so "The Lavender Hill
+        # Mob" files under L. We keep its order rather than re-sorting.
+        assert [f['title'] for f in films] == ['The Lavender Hill Mob', 'Paper Moon', 'Roman Holiday']
+        assert [f['playback'] for f in films] == ['transcode', 'remux', 'direct']
+        _, path, _, params = jellyfin['calls'][0]
+        assert path == '/Items'
+        assert params['IncludeItemTypes'] == 'Movie'
+        assert 'MediaSources' in params['Fields']
+
+    def test_one_film(self, client, jellyfin):
+        res = client.get(f'/api/cinema/films/{DIRECT_ID}')
+
+        assert res.status_code == 200
+        assert res.get_json()['title'] == 'Roman Holiday'
+
+    def test_an_unknown_film_is_a_404(self, client, jellyfin):
+        res = client.get('/api/cinema/films/00000000000000000000000000000000')
+
+        assert res.status_code == 404
+        assert res.get_json() == {'error': 'no such film'}
 
 
 class TestPlay:

@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import HabitsPage from './habits/HabitsPage'
 import Home from './Home'
 import BlogPage from './blog/BlogPage'
+import CinemaPage from './cinema/CinemaPage'
 import Layout from './Layout'
 import MusicPage from './music/MusicPage'
 import NotFound from './NotFound'
@@ -16,6 +17,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="music" element={<MusicPage />} />
+          <Route path="cinema/*" element={<CinemaPage />} />
           <Route path="todo" element={<TodoPage />} />
           <Route path="habits" element={<HabitsPage />} />
           <Route path="recipes/*" element={<RecipesPage />} />
