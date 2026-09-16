@@ -10,7 +10,7 @@ const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5]
 const SECTIONS = [
   { to: '/music', title: 'Music', blurb: "Let's Partayyy" },
   { to: '/cinema', title: 'Cinema', blurb: 'Movie Night!!!' },
-  { to: '/photos', title: 'Photos', blurb: 'Memory Lane' },
+  { to: '/photos', title: 'Photos', blurb: "Let's go down memory lane" },
   { to: '/todo', title: 'To-do', blurb: 'Get Shit Done' },
   { to: '/habits', title: 'Habits', blurb: "Okay, She's Consistent" },
   { to: '/recipes', title: 'Recipes', blurb: 'Yummmmmmm' },

@@ -41,7 +41,7 @@ export default function PhotosPage() {
       <div className="title-row">
         <div>
           <h1>Photos</h1>
-          <p className="subtitle">Memory Lane</p>
+          <p className="subtitle">Let's go down memory lane</p>
         </div>
         <label className="btn btn-primary upload">
           {busy ? 'Adding…' : 'Add photos'}
