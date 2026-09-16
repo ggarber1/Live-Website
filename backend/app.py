@@ -36,22 +36,45 @@ def cors_origins():
     return [origin.strip() for origin in raw.split(',') if origin.strip()]
 
 
+# Every blueprint lives under /api so the frontend's routes (/todo, /recipes/3)
+# can never collide with the API's (/api/todo, /api/recipes/3).
+API_PREFIX = '/api'
+
 app = flask.Flask(__name__)
 CORS(app, origins=cors_origins())
 
 db.init_app(app)
 app.cli.add_command(scan_music_command)
 
-app.register_blueprint(blog_bp)
-app.register_blueprint(habits_bp)
-app.register_blueprint(music_bp)
-app.register_blueprint(recipes_bp)
-app.register_blueprint(todo_bp)
+app.register_blueprint(blog_bp, url_prefix=API_PREFIX)
+app.register_blueprint(habits_bp, url_prefix=API_PREFIX)
+app.register_blueprint(music_bp, url_prefix=API_PREFIX)
+app.register_blueprint(recipes_bp, url_prefix=API_PREFIX)
+app.register_blueprint(todo_bp, url_prefix=API_PREFIX)
 
 
 @app.errorhandler(HTTPException)
 def json_error(err):
     return {"error": err.description}, err.code
+
+
+@app.errorhandler(404)
+def not_found(err):
+    """The SPA fallback, scoped so it cannot mask an API mistake.
+
+    A GET for a path outside /api that matches no file in dist/ is a client
+    route like /recipes/3, so index.html is served and the router takes over.
+    Anything under /api, and any other method, stays a JSON 404. Registered on
+    404 specifically so it wins over the HTTPException handler above.
+    """
+    path = flask.request.path
+    is_page = (flask.request.method == 'GET'
+               and not path.startswith(API_PREFIX + '/')
+               and path != API_PREFIX
+               and os.path.isfile(os.path.join(DIST_DIR, 'index.html')))
+    if is_page:
+        return send_from_directory(DIST_DIR, 'index.html')
+    return json_error(err)
 
 
 @app.errorhandler(500)

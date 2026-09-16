@@ -68,7 +68,7 @@ def test_get_returns_arrays_not_bytes(client, reads):
         'ingredients': b'["bread"]', 'instructions': b'["toast it"]',
     }]
 
-    res = client.get('/recipes')
+    res = client.get('/api/recipes')
 
     assert res.status_code == 200
     assert res.get_json()[0]['ingredients'] == ['bread']
@@ -76,7 +76,7 @@ def test_get_returns_arrays_not_bytes(client, reads):
 
 
 def test_create_stores_serialized_json(client, writes):
-    res = client.post('/recipes', json=VALID_BODY)
+    res = client.post('/api/recipes', json=VALID_BODY)
 
     assert res.status_code == 201
     _, params = writes.queries[0]
@@ -88,7 +88,7 @@ def test_create_stores_serialized_json(client, writes):
 def test_create_rejects_a_pre_serialized_string(client, writes, field):
     body = {**VALID_BODY, field: '["bread"]'}
 
-    res = client.post('/recipes', json=body)
+    res = client.post('/api/recipes', json=body)
 
     assert res.status_code == 400
     assert f'{field} must be an array of strings' in res.get_json()['error']
@@ -96,7 +96,7 @@ def test_create_rejects_a_pre_serialized_string(client, writes, field):
 
 
 def test_update_stores_serialized_json(client, writes):
-    res = client.put('/recipes/1', json=VALID_BODY)
+    res = client.put('/api/recipes/1', json=VALID_BODY)
 
     assert res.status_code == 204
     _, params = writes.queries[0]
@@ -104,7 +104,7 @@ def test_update_stores_serialized_json(client, writes):
 
 
 def test_update_rejects_a_bad_array(client, writes):
-    res = client.put('/recipes/1', json={**VALID_BODY, 'ingredients': 'bread'})
+    res = client.put('/api/recipes/1', json={**VALID_BODY, 'ingredients': 'bread'})
 
     assert res.status_code == 400
     assert writes.queries == []

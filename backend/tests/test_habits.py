@@ -45,7 +45,7 @@ def habit(reads):
 
 
 def test_complete_returns_the_updated_habit(client, habit, writes):
-    res = client.post('/habits/3/complete')
+    res = client.post('/api/habits/3/complete')
 
     assert res.status_code == 200
     body = res.get_json()
@@ -55,7 +55,7 @@ def test_complete_returns_the_updated_habit(client, habit, writes):
 
 
 def test_complete_writes_the_new_streak_and_today(client, habit, writes):
-    client.post('/habits/3/complete')
+    client.post('/api/habits/3/complete')
 
     query, params = writes.queries[0]
     assert query == "UPDATE habits SET streak = ?, last_completed = ? WHERE id = ?"
@@ -71,7 +71,7 @@ def test_complete_is_idempotent_within_a_day(client, reads, writes):
         'created_at': datetime.datetime(2026, 9, 1, 8, 0),
     }
 
-    res = client.post('/habits/3/complete')
+    res = client.post('/api/habits/3/complete')
 
     assert res.get_json()['streak'] == 4
     _, params = writes.queries[0]
@@ -81,7 +81,7 @@ def test_complete_is_idempotent_within_a_day(client, reads, writes):
 def test_complete_404s_for_an_unknown_habit(client, reads, writes):
     reads.row = None
 
-    res = client.post('/habits/99/complete')
+    res = client.post('/api/habits/99/complete')
 
     assert res.status_code == 404
     assert 'no habit with id 99' in res.get_json()['error']
@@ -89,7 +89,7 @@ def test_complete_404s_for_an_unknown_habit(client, reads, writes):
 
 
 def test_complete_looks_the_habit_up_by_id(client, habit, reads, writes):
-    client.post('/habits/3/complete')
+    client.post('/api/habits/3/complete')
 
     query, params = reads.queries[0]
     assert query == "SELECT * FROM habits WHERE id = ? LIMIT 1"
@@ -97,7 +97,7 @@ def test_complete_looks_the_habit_up_by_id(client, habit, reads, writes):
 
 
 def test_complete_rejects_a_non_integer_id(client, reads, writes):
-    res = client.post('/habits/abc/complete')
+    res = client.post('/api/habits/abc/complete')
 
     assert res.status_code == 404
     assert writes.queries == []

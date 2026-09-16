@@ -81,7 +81,7 @@ def scan(**kwargs):
 
 
 def tracks(client, query=''):
-    return client.get('/music/tracks' + query).get_json()
+    return client.get('/api/music/tracks' + query).get_json()
 
 
 # ---------------------------------------------------------------- round trips
@@ -185,9 +185,9 @@ def test_the_response_never_contains_the_filesystem_path(library, client):
 
     assert 'path' not in row
     assert 'mtime_ns' not in row
-    assert str(library) not in client.get('/music/tracks').get_data(as_text=True)
+    assert str(library) not in client.get('/api/music/tracks').get_data(as_text=True)
 
-    single = client.get(f"/music/tracks/{row['id']}").get_json()
+    single = client.get(f"/api/music/tracks/{row['id']}").get_json()
     assert 'path' not in single
     assert 'mtime_ns' not in single
 
@@ -312,7 +312,7 @@ def test_stream_returns_the_bytes_on_disk(library, client):
     scan()
     track_id = tracks(client)['tracks'][0]['id']
 
-    res = client.get(f'/music/tracks/{track_id}/stream')
+    res = client.get(f'/api/music/tracks/{track_id}/stream')
 
     assert res.status_code == 200
     assert res.get_data() == b'EXACTBYTES'
@@ -323,7 +323,7 @@ def test_stream_honours_a_range_request(library, client):
     scan()
     track_id = tracks(client)['tracks'][0]['id']
 
-    res = client.get(f'/music/tracks/{track_id}/stream',
+    res = client.get(f'/api/music/tracks/{track_id}/stream',
                      headers={'Range': 'bytes=3-6'})
 
     assert res.status_code == 206
@@ -344,7 +344,7 @@ def test_stream_sets_an_audio_content_type_for_a_real_file(library, client,
     scan()
     track_id = tracks(client)['tracks'][0]['id']
 
-    res = client.get(f'/music/tracks/{track_id}/stream')
+    res = client.get(f'/api/music/tracks/{track_id}/stream')
 
     assert res.mimetype == expected
 

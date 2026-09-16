@@ -3,15 +3,15 @@ import datetime
 import mariadb
 import pytest
 
-LIST_PATHS = ['/todo', '/habits', '/blog', '/recipes']
+LIST_PATHS = ['/api/todo', '/api/habits', '/api/blog', '/api/recipes']
 
 CREATE_CASES = [
-    ('/todo', {'task': 'buy milk'}, ('buy milk',)),
-    ('/habits', {'name': 'floss'}, ('floss',)),
-    ('/blog', {'title': 'hi', 'content': 'there'}, ('hi', 'there')),
+    ('/api/todo', {'task': 'buy milk'}, ('buy milk',)),
+    ('/api/habits', {'name': 'floss'}, ('floss',)),
+    ('/api/blog', {'title': 'hi', 'content': 'there'}, ('hi', 'there')),
     (
         # The API takes real arrays; the route serializes them for storage.
-        '/recipes',
+        '/api/recipes',
         {'title': 'toast', 'ingredients': ['bread'], 'instructions': ['toast it']},
         ('toast', '["bread"]', '["toast it"]'),
     ),

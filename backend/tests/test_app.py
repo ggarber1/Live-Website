@@ -67,7 +67,7 @@ def test_unhandled_error_returns_json_not_html(crashing_client, monkeypatch):
 
     monkeypatch.setattr(todo.todo, 'fetch_all', boom)
 
-    res = crashing_client.get('/todo')
+    res = crashing_client.get('/api/todo')
 
     assert res.status_code == 500
     assert res.mimetype == 'application/json'
@@ -80,13 +80,13 @@ def test_unhandled_error_does_not_leak_internals(crashing_client, monkeypatch):
 
     monkeypatch.setattr(todo.todo, 'fetch_all', boom)
 
-    res = crashing_client.get('/todo')
+    res = crashing_client.get('/api/todo')
 
     assert 'Access denied' not in res.get_data(as_text=True)
 
 
 def test_http_errors_still_use_their_own_handler(crashing_client):
-    res = crashing_client.get('/nope')
+    res = crashing_client.get('/api/nope')
 
     assert res.status_code == 404
     assert res.mimetype == 'application/json'

@@ -145,8 +145,8 @@ sudo systemctl enable --now livs-api
 ```bash
 systemctl status livs-api
 curl -s localhost:5000/ | head -c 80   # -> <!doctype html>...
-curl localhost:5000/todo          # -> []
-curl http://<pi-ip>:5000/todo     # from another machine on the network
+curl localhost:5000/api/todo          # -> []
+curl http://<pi-ip>:5000/api/todo     # from another machine on the network
 ```
 
 Logs: `journalctl -u livs-api -f`

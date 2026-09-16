@@ -61,12 +61,12 @@ def test_recipe_round_trips_as_real_arrays(client, cleanup):
         'instructions': ['toast the bread', 'butter it'],
     }
 
-    res = client.post('/recipes', json=body)
+    res = client.post('/api/recipes', json=body)
     assert res.status_code == 201, res.get_data(as_text=True)
     recipe_id = res.get_json()['id']
     cleanup.append(('recipes', recipe_id))
 
-    listed = client.get('/recipes')
+    listed = client.get('/api/recipes')
     assert listed.status_code == 200, listed.get_data(as_text=True)
 
     row = next(r for r in listed.get_json() if r['id'] == recipe_id)
@@ -77,86 +77,86 @@ def test_recipe_round_trips_as_real_arrays(client, cleanup):
 
 def test_recipe_list_does_not_500_with_rows_present(client, cleanup):
     """The original bug: one stored recipe took down the whole list endpoint."""
-    res = client.post('/recipes', json={
+    res = client.post('/api/recipes', json={
         'title': 'x', 'ingredients': ['a'], 'instructions': ['b'],
     })
     cleanup.append(('recipes', res.get_json()['id']))
 
-    assert client.get('/recipes').status_code == 200
+    assert client.get('/api/recipes').status_code == 200
 
 
 def test_recipe_update_round_trips(client, cleanup):
-    res = client.post('/recipes', json={
+    res = client.post('/api/recipes', json={
         'title': 'x', 'ingredients': ['a'], 'instructions': ['b'],
     })
     recipe_id = res.get_json()['id']
     cleanup.append(('recipes', recipe_id))
 
-    assert client.put(f'/recipes/{recipe_id}', json={
+    assert client.put(f'/api/recipes/{recipe_id}', json={
         'title': 'y', 'ingredients': ['c', 'd'], 'instructions': ['e'],
     }).status_code == 204
 
-    row = next(r for r in client.get('/recipes').get_json() if r['id'] == recipe_id)
+    row = next(r for r in client.get('/api/recipes').get_json() if r['id'] == recipe_id)
     assert row['ingredients'] == ['c', 'd']
 
 
 def test_empty_arrays_round_trip(client, cleanup):
-    res = client.post('/recipes', json={
+    res = client.post('/api/recipes', json={
         'title': 'empty', 'ingredients': [], 'instructions': [],
     })
     cleanup.append(('recipes', res.get_json()['id']))
 
-    row = next(r for r in client.get('/recipes').get_json()
+    row = next(r for r in client.get('/api/recipes').get_json()
                if r['id'] == cleanup[0][1])
     assert row['ingredients'] == []
 
 
 def test_unicode_survives_the_json_column(client, cleanup):
-    res = client.post('/recipes', json={
+    res = client.post('/api/recipes', json={
         'title': 'crème brûlée', 'ingredients': ['crème', 'sucre'], 'instructions': ['brûler'],
     })
     cleanup.append(('recipes', res.get_json()['id']))
 
-    row = next(r for r in client.get('/recipes').get_json() if r['id'] == cleanup[0][1])
+    row = next(r for r in client.get('/api/recipes').get_json() if r['id'] == cleanup[0][1])
     assert row['ingredients'] == ['crème', 'sucre']
     assert row['title'] == 'crème brûlée'
 
 
 def test_todo_write_actually_commits(client, cleanup):
-    res = client.post('/todo', json={'task': 'integration probe'})
+    res = client.post('/api/todo', json={'task': 'integration probe'})
     todo_id = res.get_json()['id']
     cleanup.append(('todo', todo_id))
 
     # A separate request means a separate connection: only a committed row shows.
-    rows = client.get('/todo').get_json()
+    rows = client.get('/api/todo').get_json()
     assert any(r['id'] == todo_id and r['task'] == 'integration probe' for r in rows)
 
 
 def test_habit_streak_advances_across_days(client, cleanup):
-    res = client.post('/habits', json={'name': 'integration probe'})
+    res = client.post('/api/habits', json={'name': 'integration probe'})
     habit_id = res.get_json()['id']
     cleanup.append(('habits', habit_id))
 
-    assert client.post(f'/habits/{habit_id}/complete').get_json()['streak'] == 1
-    assert client.post(f'/habits/{habit_id}/complete').get_json()['streak'] == 1
+    assert client.post(f'/api/habits/{habit_id}/complete').get_json()['streak'] == 1
+    assert client.post(f'/api/habits/{habit_id}/complete').get_json()['streak'] == 1
 
     with flask_app.app_context():
         db.execute("UPDATE habits SET last_completed = ? WHERE id = ?",
                    (datetime.date.today() - datetime.timedelta(days=1), habit_id))
 
-    assert client.post(f'/habits/{habit_id}/complete').get_json()['streak'] == 2
+    assert client.post(f'/api/habits/{habit_id}/complete').get_json()['streak'] == 2
 
     with flask_app.app_context():
         db.execute("UPDATE habits SET last_completed = ? WHERE id = ?",
                    (datetime.date.today() - datetime.timedelta(days=5), habit_id))
 
-    assert client.post(f'/habits/{habit_id}/complete').get_json()['streak'] == 1
+    assert client.post(f'/api/habits/{habit_id}/complete').get_json()['streak'] == 1
 
 
 def test_blog_round_trips(client, cleanup):
-    res = client.post('/blog', json={'title': 'probe', 'content': 'body'})
+    res = client.post('/api/blog', json={'title': 'probe', 'content': 'body'})
     post_id = res.get_json()['id']
     cleanup.append(('blog', post_id))
 
-    row = next(r for r in client.get('/blog').get_json() if r['id'] == post_id)
+    row = next(r for r in client.get('/api/blog').get_json() if r['id'] == post_id)
     assert row['content'] == 'body'

@@ -12,7 +12,7 @@ def test_list_returns_tracks_with_pagination_envelope(client, reads):
     reads.rows = [TRACK_ROW]
     reads.row = {'n': 1}
 
-    res = client.get('/music/tracks')
+    res = client.get('/api/music/tracks')
 
     assert res.status_code == 200
     body = res.get_json()
@@ -32,7 +32,7 @@ def test_list_envelope_is_an_object_not_a_bare_array(client, reads):
     reads.rows = []
     reads.row = {'n': 0}
 
-    res = client.get('/music/tracks')
+    res = client.get('/api/music/tracks')
 
     assert res.status_code == 200
     assert set(res.get_json()) == {'tracks', 'total', 'limit', 'offset'}
@@ -42,7 +42,7 @@ def test_list_runs_a_count_and_a_page_query(client, reads):
     reads.rows = []
     reads.row = {'n': 0}
 
-    client.get('/music/tracks')
+    client.get('/api/music/tracks')
 
     queries = [q for q, _ in reads.queries]
     assert any('COUNT(*)' in q for q in queries)
@@ -60,7 +60,7 @@ def test_list_orders_deterministically(client, reads):
     reads.rows = []
     reads.row = {'n': 0}
 
-    client.get('/music/tracks')
+    client.get('/api/music/tracks')
 
     page = next(q for q, _ in reads.queries if 'LIMIT' in q)
     assert 'ORDER BY artist, album, track_no, title, id' in page
@@ -75,7 +75,7 @@ def test_list_does_not_expose_the_filesystem_path(client, reads):
     reads.rows = []
     reads.row = {'n': 0}
 
-    client.get('/music/tracks')
+    client.get('/api/music/tracks')
 
     page = next(q for q, _ in reads.queries if 'LIMIT' in q)
     selected = page.split('FROM')[0]
@@ -91,7 +91,7 @@ def test_list_does_not_swallow_query_errors(client, reads):
     reads.error = mariadb.Error('table is gone')
 
     with pytest.raises(mariadb.Error):
-        client.get('/music/tracks')
+        client.get('/api/music/tracks')
 
 
 class TestPagination:
@@ -99,7 +99,7 @@ class TestPagination:
         reads.rows = []
         reads.row = {'n': 0}
 
-        res = client.get('/music/tracks?limit=10&offset=20')
+        res = client.get('/api/music/tracks?limit=10&offset=20')
 
         assert res.get_json()['limit'] == 10
         assert res.get_json()['offset'] == 20
@@ -110,7 +110,7 @@ class TestPagination:
         reads.rows = []
         reads.row = {'n': 0}
 
-        res = client.get('/music/tracks?limit=99999')
+        res = client.get('/api/music/tracks?limit=99999')
 
         assert res.get_json()['limit'] == 200
 
@@ -119,7 +119,7 @@ class TestPagination:
         reads.rows = []
         reads.row = {'n': 0}
 
-        res = client.get('/music/tracks?limit=200')
+        res = client.get('/api/music/tracks?limit=200')
 
         assert res.status_code == 200
         assert res.get_json()['limit'] == 200
@@ -131,7 +131,7 @@ class TestPagination:
         reads.rows = []
         reads.row = {'n': 0}
 
-        res = client.get(f'/music/tracks?{query}')
+        res = client.get(f'/api/music/tracks?{query}')
 
         assert res.status_code == 400
         assert 'error' in res.get_json()
@@ -142,7 +142,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=beach')
+        client.get('/api/music/tracks?q=beach')
 
         page, params = next((q, p) for q, p in reads.queries if 'LIMIT' in q)
         assert ("WHERE title LIKE ? ESCAPE '!' OR artist LIKE ? ESCAPE '!' "
@@ -154,7 +154,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get("/music/tracks?q=%27%3B%20DROP%20TABLE%20track%3B%20--")
+        client.get("/api/music/tracks?q=%27%3B%20DROP%20TABLE%20track%3B%20--")
 
         for query, _ in reads.queries:
             assert 'DROP TABLE' not in query
@@ -163,7 +163,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=beach')
+        client.get('/api/music/tracks?q=beach')
 
         count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert 'WHERE' in count
@@ -173,7 +173,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=%20%20')
+        client.get('/api/music/tracks?q=%20%20')
 
         count, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert 'WHERE' not in count
@@ -189,7 +189,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=50%25_mix')
+        client.get('/api/music/tracks?q=50%25_mix')
 
         _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert params[0] == '%50!%!_mix%'
@@ -200,7 +200,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=hey%21_you')
+        client.get('/api/music/tracks?q=hey%21_you')
 
         _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert params[0] == '%hey!!!_you%'
@@ -210,7 +210,7 @@ class TestSearch:
         reads.rows = []
         reads.row = {'n': 0}
 
-        client.get('/music/tracks?q=foo%5Cbar')
+        client.get('/api/music/tracks?q=foo%5Cbar')
 
         _, params = next((q, p) for q, p in reads.queries if 'COUNT(*)' in q)
         assert params[0] == '%foo\\bar%'
@@ -220,7 +220,7 @@ class TestSingleTrack:
     def test_returns_the_track(self, client, reads):
         reads.row = TRACK_ROW
 
-        res = client.get('/music/tracks/1')
+        res = client.get('/api/music/tracks/1')
 
         assert res.status_code == 200
         assert res.get_json()['title'] == 'Space Song'
@@ -228,7 +228,7 @@ class TestSingleTrack:
     def test_unknown_id_is_a_404(self, client, reads):
         reads.row = None
 
-        res = client.get('/music/tracks/999')
+        res = client.get('/api/music/tracks/999')
 
         assert res.status_code == 404
         assert 'no track with id 999' in res.get_json()['error']
@@ -236,7 +236,7 @@ class TestSingleTrack:
     def test_looks_up_by_bound_id(self, client, reads):
         reads.row = TRACK_ROW
 
-        client.get('/music/tracks/1')
+        client.get('/api/music/tracks/1')
 
         query, params = reads.queries[0]
         assert params == (1,)
@@ -249,7 +249,7 @@ class TestSingleTrack:
         """
         reads.row = TRACK_ROW
 
-        client.get('/music/tracks/1')
+        client.get('/api/music/tracks/1')
 
         query, _ = reads.queries[0]
         selected = query.split('FROM')[0]
@@ -270,7 +270,7 @@ class TestStreaming:
                                                  monkeypatch, tmp_path):
         self._serve(tmp_path, monkeypatch, reads)
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.status_code == 200
         assert res.get_data() == b'ID3audiodata'
@@ -291,14 +291,14 @@ class TestStreaming:
         """
         self._serve(tmp_path, monkeypatch, reads, name=name)
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.mimetype == expected
 
     def test_advertises_range_support(self, client, reads, monkeypatch, tmp_path):
         self._serve(tmp_path, monkeypatch, reads, payload=b'0123456789')
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.headers['Accept-Ranges'] == 'bytes'
 
@@ -307,7 +307,7 @@ class TestStreaming:
         """Seeking in an <audio> element depends on this."""
         self._serve(tmp_path, monkeypatch, reads, payload=b'0123456789')
 
-        res = client.get('/music/tracks/1/stream',
+        res = client.get('/api/music/tracks/1/stream',
                          headers={'Range': 'bytes=2-5'})
 
         assert res.status_code == 206
@@ -317,7 +317,7 @@ class TestStreaming:
     def test_unknown_id_is_a_404(self, client, reads):
         reads.row = None
 
-        assert client.get('/music/tracks/999/stream').status_code == 404
+        assert client.get('/api/music/tracks/999/stream').status_code == 404
 
     def test_path_outside_the_root_is_refused(self, client, reads,
                                               monkeypatch, tmp_path):
@@ -329,7 +329,7 @@ class TestStreaming:
         monkeypatch.setenv('MUSIC_DIR', str(root))
         reads.row = {**TRACK_ROW, 'path': str(secret)}
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.status_code == 404
         assert b'password' not in res.get_data()
@@ -346,7 +346,7 @@ class TestStreaming:
         monkeypatch.setenv('MUSIC_DIR', str(root))
         reads.row = {**TRACK_ROW, 'path': str(link)}
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.status_code == 404
         assert b'password' not in res.get_data()
@@ -360,7 +360,7 @@ class TestStreaming:
         monkeypatch.setenv('MUSIC_DIR', str(root))
         reads.row = {**TRACK_ROW, 'path': str(outside)}
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.get_json()['error'] == 'no track with id 1'
 
@@ -369,7 +369,7 @@ class TestStreaming:
         monkeypatch.setenv('MUSIC_DIR', str(tmp_path))
         reads.row = {**TRACK_ROW, 'path': str(tmp_path / 'deleted.mp3')}
 
-        res = client.get('/music/tracks/1/stream')
+        res = client.get('/api/music/tracks/1/stream')
 
         assert res.status_code == 404
         assert 'missing on disk' in res.get_json()['error']
@@ -379,7 +379,7 @@ class TestStreaming:
         """Server-side use, so path is the one column it should ask for."""
         self._serve(tmp_path, monkeypatch, reads)
 
-        client.get('/music/tracks/1/stream')
+        client.get('/api/music/tracks/1/stream')
 
         query, params = reads.queries[0]
         assert 'SELECT path FROM track' in query
@@ -390,7 +390,7 @@ class TestStreaming:
         from app import app as flask_app
 
         for rule in flask_app.url_map.iter_rules():
-            if str(rule).startswith('/music'):
+            if str(rule).startswith('/api/music'):
                 assert 'path' not in rule.arguments
 
 
