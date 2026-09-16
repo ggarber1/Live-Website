@@ -33,6 +33,7 @@ REQUESTS = [
     ('get', '/api/photos', None),
     ('get', '/api/photos/1', None),
     ('put', '/api/photos/1', {'caption': 'us'}),
+    ('delete', '/api/photos/1', None),
     # With ?q=, so the search clause is actually executed. Without it the
     # route takes the no-filter branch and the LIKE columns are never checked.
     ('get', '/api/music/tracks?q=beach', None),

@@ -8,9 +8,11 @@ import os
 from flask import Blueprint, abort, jsonify, request, send_file
 
 from api import json_body
-from database.db import execute, fetch_all, fetch_one, insert  # noqa: F401  (insert: upload, next task)
-from photos.config import resolve_inside_photos_dir
-from photos.thumbs import SIZES, thumbnail
+from database.db import execute, fetch_all, fetch_one, insert
+from photos.config import photos_dir, resolve_inside_photos_dir
+from photos.scanner import INSERT_PHOTO
+from photos.thumbs import SIZES, forget, thumbnail
+from photos.upload import Rejected, save_upload
 
 bp = Blueprint('photos', __name__)
 
@@ -107,3 +109,57 @@ def thumb(photo_id):
     # for a different file by this app, so the thumbnail can be cached hard.
     response.headers['Cache-Control'] = 'public, max-age=31536000'
     return response
+
+
+@bp.route('/photos', methods=['POST'])
+def upload():
+    """Multipart field `files`, repeatable. One bad file does not fail the rest.
+
+    201 with what was added when at least one file was kept; 400 with the
+    reasons when none was.
+    """
+    files = request.files.getlist('files')
+    if not files:
+        abort(400, description="send one or more files in the 'files' field")
+    root = photos_dir()
+    added, rejected = [], []
+    for upload in files:
+        name = upload.filename or 'file'
+        try:
+            path, meta, stat = save_upload(root, upload.stream, name)
+        except Rejected as err:
+            rejected.append({'name': name, 'reason': str(err)})
+            continue
+        photo_id = insert(INSERT_PHOTO, (
+            path, meta['taken_at'], meta['width'], meta['height'], meta['format'],
+            stat.st_size, stat.st_mtime_ns,
+        ))
+        added.append({
+            'id': photo_id, 'taken_at': meta['taken_at'], 'width': meta['width'],
+            'height': meta['height'], 'format': meta['format'],
+            'size_bytes': stat.st_size, 'caption': None,
+        })
+    status = 201 if added else 400
+    return jsonify({'added': added, 'rejected': rejected}), status
+
+
+@bp.route('/photos/<int:photo_id>', methods=['DELETE'])
+def delete_photo(photo_id):
+    """Remove the file, its thumbnails and the row, in that order.
+
+    A file that is already gone, or a path that fails containment, still
+    lets the row go: the row is what the site shows, and it is wrong either
+    way. Nothing outside PHOTOS_DIR is ever removed.
+    """
+    row = fetch_one("SELECT path FROM photo WHERE id = ? LIMIT 1", (photo_id,))
+    if row is None:
+        abort(404, description=f"no photo with id {photo_id}")
+    path = resolve_inside_photos_dir(row['path'])
+    if path is not None:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    forget(photo_id)
+    execute("DELETE FROM photo WHERE id = ?", (photo_id,))
+    return "", 204

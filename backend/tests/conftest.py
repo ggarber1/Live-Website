@@ -28,6 +28,7 @@ def db_env(monkeypatch):
     monkeypatch.delenv('DB_HOST', raising=False)
     monkeypatch.delenv('DB_PORT', raising=False)
     monkeypatch.setenv('MUSIC_DIR', '/tmp/livs-test-music')
+    monkeypatch.setenv('PHOTOS_DIR', '/tmp/livs-test-photos')
 
 
 class FakeWrites:
