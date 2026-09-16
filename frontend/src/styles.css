@@ -449,12 +449,12 @@ button.title {
   opacity: 0.35;
 }
 
-.todo-list .task {
+.inline-text {
   flex: 1;
   overflow-wrap: anywhere;
 }
 
-.todo-list .field {
+.inline-field {
   flex: 1;
   background: var(--paper);
   padding: 0.25rem 0.6rem;
@@ -480,4 +480,41 @@ button.title {
   color: var(--ink-soft);
   font-style: italic;
   padding: 0.15rem 0.6rem;
+}
+
+/* ------------------------------------------------------------- habits */
+
+.habit-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.habit-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.habit-name {
+  flex: 1 1 12rem;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+}
+
+.habit-name .describe {
+  flex-basis: 100%;
+}
+
+.btn-done:disabled {
+  opacity: 1;
+  background: var(--lavender);
+  border-color: var(--lavender);
+  color: var(--lavender-deep);
 }

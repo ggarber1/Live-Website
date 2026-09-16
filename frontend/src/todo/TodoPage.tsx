@@ -1,4 +1,6 @@
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+
+import InlineEdit from '../InlineEdit'
 
 import { addTodo, listTodos, removeTodo, renameTodo, type Todo } from './api'
 
@@ -97,20 +99,6 @@ interface RowProps {
 }
 
 function TodoRow({ todo, leaving, onFinish, onRename }: RowProps) {
-  const [editing, setEditing] = useState(false)
-  const [text, setText] = useState(todo.task)
-
-  const keys = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const task = text.trim()
-      if (task && task !== todo.task) onRename(task)
-      setEditing(false)
-    } else if (e.key === 'Escape') {
-      setText(todo.task)
-      setEditing(false)
-    }
-  }
-
   return (
     <li className={leaving ? 'leaving' : undefined}>
       <button
@@ -120,24 +108,7 @@ function TodoRow({ todo, leaving, onFinish, onRename }: RowProps) {
         disabled={leaving}
         onClick={onFinish}
       />
-      {editing ? (
-        <input
-          className="field"
-          aria-label="Task"
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={keys}
-          onBlur={() => { setText(todo.task); setEditing(false) }}
-        />
-      ) : (
-        <>
-          <span className="task">{todo.task}</span>
-          <button type="button" className="btn btn-quiet" onClick={() => setEditing(true)}>
-            edit
-          </button>
-        </>
-      )}
+      <InlineEdit value={todo.task} label="Task" onSave={onRename} />
     </li>
   )
 }
