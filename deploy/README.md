@@ -11,8 +11,10 @@ dev headers have to be present *before* pip runs.
 
 ```bash
 sudo apt update
-sudo apt install -y mariadb-server libmariadb-dev python3-venv python3-dev build-essential
+sudo apt install -y mariadb-server libmariadb-dev python3-venv python3-dev build-essential nodejs npm
 ```
+
+`nodejs` and `npm` build the frontend; they are not needed at runtime.
 
 ## 2. Database and user
 
@@ -116,7 +118,21 @@ sudo systemctl enable --now livs-scan.timer
 
 Check it: `systemctl list-timers livs-scan` and `journalctl -u livs-scan -n 50`.
 
-## 7. Install the service
+## 7. Build the frontend
+
+Flask serves `frontend/dist/` on the same origin as the API, so there is no
+second server and `CORS_ORIGINS` is irrelevant in production. The build is
+not checked in; do this on every deploy that touches `frontend/`.
+
+```bash
+cd /home/pi/livs_website/frontend
+npm ci
+npm run build
+```
+
+Until this has run, `GET /` answers 404 with a message saying so.
+
+## 8. Install the service
 
 ```bash
 sudo cp /home/pi/livs_website/deploy/livs-api.service /etc/systemd/system/
@@ -124,10 +140,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now livs-api
 ```
 
-## 8. Verify
+## 9. Verify
 
 ```bash
 systemctl status livs-api
+curl -s localhost:5000/ | head -c 80   # -> <!doctype html>...
 curl localhost:5000/todo          # -> []
 curl http://<pi-ip>:5000/todo     # from another machine on the network
 ```
@@ -140,6 +157,7 @@ Logs: `journalctl -u livs-api -f`
 cd /home/pi/livs_website && git pull
 ./backend/venv/bin/pip install -r backend/requirements.txt
 ./backend/venv/bin/flask --app app init-db   # only if the schema changed
+(cd frontend && npm ci && npm run build)    # only if frontend/ changed
 sudo systemctl restart livs-api
 ```
 

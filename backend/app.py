@@ -2,6 +2,7 @@ import os
 
 import flask
 from dotenv import load_dotenv
+from flask import abort, send_from_directory
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
@@ -15,6 +16,11 @@ from music.music import bp as music_bp
 from music.scanner import scan_music_command
 from recipes.recipes import bp as recipes_bp
 from todo.todo import bp as todo_bp
+
+# The built frontend. Served from the same origin so the Pi runs one process;
+# CORS_ORIGINS only matters for the Vite dev server.
+DIST_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'dist'))
 
 # Local dev servers. Set CORS_ORIGINS in .env to the real frontend origin.
 DEFAULT_CORS_ORIGINS = 'http://localhost:5173,http://localhost:3000'
@@ -61,9 +67,30 @@ def unexpected_error(err):
     return {"error": "internal server error"}, 500
 
 
-@app.route('/', methods=['GET'])
-def howdy():
-    return "Howdy!"
+def dist_or_404():
+    if not os.path.isfile(os.path.join(DIST_DIR, 'index.html')):
+        abort(404, description="frontend not built: run `npm run build` in frontend/")
+
+
+# Two narrow rules that mirror Vite's output rather than one `<path:>`
+# catch-all. A catch-all also matched `PUT /todo/abc`, turning the API's 404
+# for a bad id into a 405 because these views only allow GET. Only files that
+# exist are served; anything else is the usual JSON 404. There is no
+# client-side router, so no deep links exist, and falling back to index.html
+# would turn every mistyped API path into a 200 HTML page. Blueprint routes
+# win over `/<filename>` because static rules are more specific, and
+# send_from_directory refuses traversal.
+@app.route('/')
+@app.route('/<filename>')
+def frontend(filename='index.html'):
+    dist_or_404()
+    return send_from_directory(DIST_DIR, filename)
+
+
+@app.route('/assets/<path:filename>')
+def frontend_asset(filename):
+    dist_or_404()
+    return send_from_directory(os.path.join(DIST_DIR, 'assets'), filename)
 
 
 if __name__ == "__main__":
