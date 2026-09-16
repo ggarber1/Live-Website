@@ -25,7 +25,7 @@ test('getPost finds one in the list and rejects for an unknown id', async () => 
   vi.stubGlobal('fetch', respond(200, [post]))
 
   expect(await getPost(1)).toEqual(post)
-  await expect(getPost(2)).rejects.toThrow('no entry with id 2')
+  await expect(getPost(2)).rejects.toThrow('no post with id 2')
 })
 
 test('creates, updates and removes', async () => {

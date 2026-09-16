@@ -1,8 +1,5 @@
 import { json, request } from '../http'
 
-// The section is "Journal" everywhere a person sees it; the API and table
-// are still called blog. This file is the only place the two names meet.
-
 export interface PostDraft {
   title: string
   content: string
@@ -19,7 +16,7 @@ export function listPosts(): Promise<Post[]> {
 
 export async function getPost(id: number): Promise<Post> {
   const found = (await listPosts()).find((p) => p.id === id)
-  if (!found) throw new Error(`no entry with id ${id}`)
+  if (!found) throw new Error(`no post with id ${id}`)
   return found
 }
 

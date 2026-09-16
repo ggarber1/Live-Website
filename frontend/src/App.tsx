@@ -2,7 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 
 import HabitsPage from './habits/HabitsPage'
 import Home from './Home'
-import JournalPage from './journal/JournalPage'
+import BlogPage from './blog/BlogPage'
 import Layout from './Layout'
 import MusicPage from './music/MusicPage'
 import NotFound from './NotFound'
@@ -19,7 +19,7 @@ export default function App() {
           <Route path="todo" element={<TodoPage />} />
           <Route path="habits" element={<HabitsPage />} />
           <Route path="recipes/*" element={<RecipesPage />} />
-          <Route path="journal/*" element={<JournalPage />} />
+          <Route path="blog/*" element={<BlogPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

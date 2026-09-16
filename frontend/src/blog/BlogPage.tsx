@@ -7,7 +7,7 @@ import PostForm from './PostForm'
 import PostPage from './PostPage'
 import { excerpt } from './text'
 
-export default function JournalPage() {
+export default function BlogPage() {
   return (
     <Routes>
       <Route index element={<EntryList />} />
@@ -30,17 +30,17 @@ function EntryList() {
     <>
       <div className="title-row">
         <div>
-          <h1>Journal</h1>
+          <h1>Blog</h1>
           <p className="subtitle">A page for whatever today was.</p>
         </div>
-        <Link to="/journal/new" className="btn btn-primary">Write</Link>
+        <Link to="/blog/new" className="btn btn-primary">Write</Link>
       </div>
       {error && <p role="alert">{error}</p>}
       {posts && posts.length === 0 && <p className="empty">Nothing written yet.</p>}
       {posts && posts.length > 0 && (
         <div className="stack">
           {posts.map((post) => (
-            <Link key={post.id} to={`/journal/${post.id}`} className="card card-link">
+            <Link key={post.id} to={`/blog/${post.id}`} className="card card-link">
               <h2>{post.title}</h2>
               <p className="date">{formatDate(post.created_at)}</p>
               <p className="excerpt">{excerpt(post.content)}</p>
@@ -61,7 +61,7 @@ function NewEntry() {
     setBusy(true)
     try {
       const id = await createPost(draft)
-      navigate(`/journal/${id}`)
+      navigate(`/blog/${id}`)
     } catch (err) {
       setError((err as Error).message)
       setBusy(false)
@@ -70,9 +70,9 @@ function NewEntry() {
 
   return (
     <>
-      <p className="crumb"><Link to="/journal">Journal</Link></p>
-      <h1>New entry</h1>
-      <p className="subtitle">However today went.</p>
+      <p className="crumb"><Link to="/blog">Blog</Link></p>
+      <h1>New post</h1>
+      <p className="subtitle">Whatever's on your mind.</p>
       {error && <p role="alert">{error}</p>}
       <div className="card">
         <PostForm onSubmit={save} busy={busy} />
@@ -96,7 +96,7 @@ function EditEntry() {
     setBusy(true)
     try {
       await updatePost(id, draft)
-      navigate(`/journal/${id}`)
+      navigate(`/blog/${id}`)
     } catch (err) {
       setError((err as Error).message)
       setBusy(false)
@@ -105,8 +105,8 @@ function EditEntry() {
 
   return (
     <>
-      <p className="crumb"><Link to={`/journal/${id}`}>{post?.title ?? 'Entry'}</Link></p>
-      <h1>Edit entry</h1>
+      <p className="crumb"><Link to={`/blog/${id}`}>{post?.title ?? 'Post'}</Link></p>
+      <h1>Edit post</h1>
       {error && <p role="alert">{error}</p>}
       {post && (
         <div className="card">

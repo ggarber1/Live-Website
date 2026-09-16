@@ -16,7 +16,7 @@ export default function PostForm({ initial, onSubmit, busy = false }: Props) {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !content.trim()) {
-      setProblem('An entry needs a title and something written.')
+      setProblem('A post needs a title and something written.')
       return
     }
     setProblem(null)
@@ -31,7 +31,7 @@ export default function PostForm({ initial, onSubmit, busy = false }: Props) {
         <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label>
-        <span className="label">Entry <em>blank line between paragraphs</em></span>
+        <span className="label">Post <em>blank line between paragraphs</em></span>
         <textarea className="field" rows={12} value={content} onChange={(e) => setContent(e.target.value)} />
       </label>
       <div className="actions">

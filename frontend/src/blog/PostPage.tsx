@@ -19,7 +19,7 @@ export default function PostPage() {
     if (!post || !confirm(`Delete "${post.title}"?`)) return
     try {
       await removePost(post.id)
-      navigate('/journal')
+      navigate('/blog')
     } catch (err) {
       setError((err as Error).message)
     }
@@ -30,14 +30,14 @@ export default function PostPage() {
 
   return (
     <>
-      <p className="crumb"><Link to="/journal">Journal</Link></p>
+      <p className="crumb"><Link to="/blog">Blog</Link></p>
       <h1>{post.title}</h1>
       <p className="subtitle">{formatDate(post.created_at)}</p>
       <article className="entry">
         {paragraphs(post.content).map((text, i) => <p key={i}>{text}</p>)}
       </article>
       <div className="actions">
-        <Link to={`/journal/${post.id}/edit`} className="btn">Edit</Link>
+        <Link to={`/blog/${post.id}/edit`} className="btn">Edit</Link>
         <button type="button" className="btn btn-danger" onClick={remove}>Delete</button>
       </div>
     </>

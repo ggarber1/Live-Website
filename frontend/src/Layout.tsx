@@ -5,7 +5,7 @@ const SECTIONS: [string, string][] = [
   ['To-do', '/todo'],
   ['Habits', '/habits'],
   ['Recipes', '/recipes'],
-  ['Journal', '/journal'],
+  ['Blog', '/blog'],
 ]
 
 export default function Layout() {

@@ -25,7 +25,7 @@ test('the nav links to every section', () => {
     ['To-do', '/todo'],
     ['Habits', '/habits'],
     ['Recipes', '/recipes'],
-    ['Journal', '/journal'],
+    ['Blog', '/blog'],
   ])
 })
 

@@ -625,3 +625,20 @@ textarea.field {
 .entry p + p {
   margin-top: 1em;
 }
+
+/* --------------------------------------------------------------- home */
+
+.hello {
+  margin: 0.5rem 0 2rem;
+}
+
+.hello h1 {
+  font-size: 2.4rem;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.hello .subtitle {
+  font-size: 1.1rem;
+  margin-bottom: 0;
+}
