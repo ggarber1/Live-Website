@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 
 import { streamUrl, type Track } from './api'
 import { describe } from '../format'
@@ -6,13 +6,15 @@ import { describe } from '../format'
 interface Props {
   track: Track | null
   onEnded: () => void
+  audioRef?: RefObject<HTMLAudioElement | null>
 }
 
 // One <audio> element that outlives the list, so searching and paging never
 // interrupt playback. Seeking is the browser's own: the stream endpoint
 // answers byte-range requests.
-export default function Player({ track, onEnded }: Props) {
-  const audio = useRef<HTMLAudioElement>(null)
+export default function Player({ track, onEnded, audioRef }: Props) {
+  const own = useRef<HTMLAudioElement>(null)
+  const audio = audioRef ?? own
   const id = track?.id ?? null
 
   // Keyed on the id, not the object: the list re-renders on every keystroke
@@ -22,7 +24,7 @@ export default function Player({ track, onEnded }: Props) {
     audio.current.play().catch(() => {
       // Autoplay refused; the controls are there for the user to press play.
     })
-  }, [id])
+  }, [id, audio])
 
   return (
     <footer className="player">

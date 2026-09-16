@@ -22,6 +22,7 @@ test('the nav links to every section', () => {
   const hrefs = Array.from(nav.querySelectorAll('a')).map((a) => [a.textContent, a.getAttribute('href')])
   expect(hrefs).toEqual([
     ['Music', '/music'],
+    ['Cinema', '/cinema'],
     ['To-do', '/todo'],
     ['Habits', '/habits'],
     ['Recipes', '/recipes'],

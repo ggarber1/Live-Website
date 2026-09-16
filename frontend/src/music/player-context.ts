@@ -5,6 +5,7 @@ import type { Track } from './api'
 export interface PlayerApi {
   playing: Track | null
   play: (tracks: Track[], index: number) => void
+  pause: () => void
 }
 
 export const PlayerContext = createContext<PlayerApi | null>(null)

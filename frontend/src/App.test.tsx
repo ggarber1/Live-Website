@@ -19,6 +19,7 @@ test('home greets and links to every section', () => {
 
   expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
   expect(screen.getByRole('main').querySelectorAll('a[href="/recipes"]').length).toBeGreaterThan(0)
+  expect(screen.getByRole('main').querySelectorAll('a[href="/cinema"]').length).toBeGreaterThan(0)
 })
 
 test('a section route renders that section', () => {

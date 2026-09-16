@@ -4,6 +4,7 @@ import { dateLine, greeting, noteOfTheDay } from './greeting'
 
 const SECTIONS = [
   { to: '/music', title: 'Music', blurb: 'Everything on the shelf, ready to play.' },
+  { to: '/cinema', title: 'Cinema', blurb: 'Something to watch tonight.' },
   { to: '/todo', title: 'To-do', blurb: 'Little things, crossed off one by one.' },
   { to: '/habits', title: 'Habits', blurb: 'Small promises, kept daily.' },
   { to: '/recipes', title: 'Recipes', blurb: 'The ones worth making again.' },
