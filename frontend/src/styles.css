@@ -597,3 +597,31 @@ textarea.field {
 .recipe li {
   padding: 0.15rem 0;
 }
+
+/* ------------------------------------------------------------ journal */
+
+.card-link .date {
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 0.35rem;
+}
+
+.card-link .excerpt {
+  font-style: normal;
+  color: var(--ink);
+}
+
+.entry {
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.entry .subtitle {
+  margin-bottom: 1.25rem;
+}
+
+.entry p + p {
+  margin-top: 1em;
+}
