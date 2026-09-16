@@ -49,6 +49,9 @@ class FakeJellyfin:
         FakeJellyfin.state['calls'].append(('GET', path, None, params))
         if path == '/Items':
             return fixture('items.json')
+        # The real server answers 400 to /Items/<id> without a userId.
+        if not (params or {}).get('userId'):
+            raise JellyfinError(400)
         wanted = path.split('/')[-1]
         for item in fixture('items.json')['Items']:
             if item['Id'] == wanted:

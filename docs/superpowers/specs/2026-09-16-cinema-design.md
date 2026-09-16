@@ -25,6 +25,7 @@ Recorded against 12.1.0 with three generated films. These are the facts the desi
 
 - **Auth header.** `Authorization: MediaBrowser Token="<key>"`. The older `X-Emby-Token` header is rejected with 401.
 - **Listing.** `GET /Items?IncludeItemTypes=Movie&Recursive=true&Fields=Overview,Genres,ProductionYear,RunTimeTicks,MediaSources&SortBy=SortName` returns `{Items, TotalRecordCount}`. Runtime is in ticks (10,000,000 per second). `ImageTags.Primary` present means a poster exists.
+- **One item.** `GET /Items/{id}?userId=<user>` works; without `userId` it answers 400 "Error processing request", unlike the listing. `/Users/{user}/Items/{id}` is equivalent.
 - **Images.** `GET /Items/{id}/Images/Primary?maxWidth=N` and `/Images/Backdrop/0` return JPEG. They need no auth.
 - **Playback decision.** `POST /Items/{id}/PlaybackInfo` with `{UserId, DeviceProfile}` returns `MediaSources[0]` with `SupportsDirectPlay`, `TranscodingUrl` (an HLS master playlist path when transcoding or remuxing) and `TranscodeReasons`, plus a `PlaySessionId`.
 - **Three outcomes, three costs:**

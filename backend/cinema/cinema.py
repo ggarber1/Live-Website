@@ -56,7 +56,10 @@ def films():
 
 @bp.route('/cinema/films/<item_id>')
 def film(item_id):
-    item = Jellyfin().get_json(f'/Items/{item_id}', params={'Fields': LIST_FIELDS})
+    # Unlike the listing, the single-item endpoint answers 400 without a userId.
+    jellyfin = Jellyfin()
+    item = jellyfin.get_json(f'/Items/{item_id}',
+                             params={'userId': jellyfin.user_id, 'Fields': LIST_FIELDS})
     return to_film(item)
 
 
