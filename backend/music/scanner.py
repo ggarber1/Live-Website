@@ -6,23 +6,12 @@ import mariadb
 from flask.cli import with_appcontext
 
 from database.db import execute, fetch_all, insert
+from library.rails import REMOVAL_FLOOR, REMOVAL_LIMIT, ScanAborted, refuse_mass_removal  # noqa: F401
 from music.config import MAX_PATH_LENGTH, music_dir
 from music.tags import AUDIO_EXTENSIONS, read_tags
 
 logger = logging.getLogger(__name__)
 
-# A single scan may not delete more than this share of the table without being
-# told to. An unmounted drive, a changed MUSIC_DIR, or the same directory
-# spelled differently (music_dir() resolves symlinks, so stored paths are
-# resolved) all make every indexed path invisible while the walk itself
-# succeeds — which is indistinguishable from the whole library being deleted.
-REMOVAL_LIMIT = 0.5
-# Below this many rows the proportional check is nuisance rather than safety.
-REMOVAL_FLOOR = 10
-
-
-class ScanAborted(RuntimeError):
-    """Raised when a scan's removals look destructive rather than intended."""
 
 
 INSERT_TRACK = """
@@ -42,13 +31,15 @@ UPDATE track
 SELECT_INDEXED = "SELECT id, path, size_bytes, mtime_ns FROM track"
 
 
-def find_audio_files(root, on_error=None):
-    """Yield every audio file under `root`, sorted within each directory.
+def find_files(root, extensions, on_error=None):
+    """Yield every file under `root` with one of `extensions`, sorted within
+    each directory.
 
     Dotfiles and dot directories are skipped. A drive that has been mounted on
     a Mac carries `._name.mp3` AppleDouble stubs, which satisfy the extension
     check while being unplayable metadata, and `.Trashes`, which can hold
-    deleted media.
+    deleted media. The photo thumbnail cache is a dot directory for the same
+    reason.
 
     Unreadable directories are logged and passed to `on_error` rather than
     vanishing. os.walk swallows scandir failures by default, which would let a
@@ -68,8 +59,12 @@ def find_audio_files(root, on_error=None):
         for name in sorted(filenames):
             if name.startswith('.'):
                 continue
-            if name.lower().endswith(AUDIO_EXTENSIONS):
+            if name.lower().endswith(extensions):
                 yield os.path.join(dirpath, name)
+
+
+def find_audio_files(root, on_error=None):
+    return find_files(root, AUDIO_EXTENSIONS, on_error)
 
 
 def _file_format(path):
@@ -103,31 +98,8 @@ def _skip(counts, reason):
 
 
 def _refuse_mass_removal(root, stale, indexed, found_any):
-    """Raise ScanAborted if deleting `stale` would gut the table.
-
-    Returns normally when the removal looks like ordinary attrition.
-
-    This is deliberately louder than the unreadable-directory case, which
-    defers removal silently: there we know the walk was incomplete, so
-    skipping removal is automatically right. Here the walk succeeded and the
-    result merely looks destructive, which needs a human to confirm.
-    """
-    if not found_any:
-        raise ScanAborted(
-            f"found no audio files under {root} but track holds "
-            f"{len(indexed)} rows; refusing to delete them. "
-            "Is the drive mounted? Pass --force-removals to proceed anyway."
-        )
-    if len(indexed) < REMOVAL_FLOOR:
-        return
-    share = len(stale) / len(indexed)
-    if share > REMOVAL_LIMIT:
-        raise ScanAborted(
-            f"scan would remove {len(stale)} of {len(indexed)} rows "
-            f"({share:.0%}) under {root}; refusing. Did MUSIC_DIR change, or "
-            "did the drive remount under a different path? Pass "
-            "--force-removals to proceed anyway."
-        )
+    refuse_mass_removal(root, stale, indexed, found_any,
+                        table='track', noun='audio', variable='MUSIC_DIR')
 
 
 def scan_music(force_removals=False):

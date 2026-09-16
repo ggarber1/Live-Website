@@ -177,6 +177,26 @@ TABLE_DDL = {
         INDEX track_listing (artist, album, track_no, title, id)
     )
     """,
+    # Same shape as track: disk is the truth, scan-photos rebuilds it, rows
+    # are updated in place so ids and captions survive. caption is the one
+    # curated column and exists nowhere on disk. taken_at is EXIF or mtime,
+    # never null, so the newest-first sort has one key. photo_recent lists
+    # id explicitly for the same reason track_listing does.
+    'photo': """
+    CREATE TABLE IF NOT EXISTS photo (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        path VARCHAR(768) NOT NULL UNIQUE,
+        taken_at DATETIME NOT NULL,
+        width INT NOT NULL,
+        height INT NOT NULL,
+        format VARCHAR(8) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        mtime_ns BIGINT NOT NULL,
+        caption VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX photo_recent (taken_at, id)
+    )
+    """,
 }
 
 

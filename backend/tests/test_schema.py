@@ -42,7 +42,7 @@ REQUESTS = [
 # and mtime. Position within the alternation does not matter — none of these
 # types is a prefix of another, so each branch is only ever tried at the one
 # position after the column name.
-COLUMN_TYPES = 'BIGINT|INT|VARCHAR|TEXT|JSON|TIMESTAMP|DATE'
+COLUMN_TYPES = 'BIGINT|INT|VARCHAR|TEXT|JSON|TIMESTAMP|DATETIME|DATE'
 
 
 def ddl_columns(ddl):
@@ -208,3 +208,27 @@ def test_track_listing_index_matches_the_listing_sort():
     index_columns = [c.strip() for c in index.group(1).split(',')]
 
     assert index_columns == sort_columns
+
+
+def test_photo_table_exists_with_the_columns_the_scanner_needs():
+    columns = ddl_columns(TABLE_DDL['photo'])
+
+    assert {'id', 'path', 'taken_at', 'width', 'height', 'format', 'size_bytes',
+            'mtime_ns', 'caption', 'created_at'} <= columns
+
+
+def test_photo_path_is_uniquely_indexed_in_full():
+    assert re.search(r'^\s*path\s+VARCHAR\(768\)\s+NOT NULL\s+UNIQUE\s*,\s*$',
+                     TABLE_DDL['photo'], re.M)
+
+
+def test_photo_recent_index_lists_id_explicitly():
+    index = re.search(r'INDEX photo_recent \((.+?)\)', TABLE_DDL['photo'])
+
+    assert index, 'photo has no photo_recent index'
+    assert [c.strip() for c in index.group(1).split(',')] == ['taken_at', 'id']
+
+
+def test_taken_at_is_never_null():
+    """The newest-first sort has one key; a null would sort unpredictably."""
+    assert re.search(r'^\s*taken_at\s+DATETIME\s+NOT NULL', TABLE_DDL['photo'], re.M)
