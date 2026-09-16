@@ -10,7 +10,7 @@ from flask import Blueprint, Response, abort, request, stream_with_context
 
 from api import json_body
 from cinema.client import Jellyfin, JellyfinError, JellyfinNotFound, JellyfinUnavailable
-from cinema.films import LIST_FIELDS, to_film
+from cinema.films import LIST_FIELDS, TICKS_PER_SECOND, to_film
 from cinema.playlist import strip_api_key
 from cinema.profile import DEVICE_PROFILE
 
@@ -47,8 +47,10 @@ def upstream_error(err):
 @bp.route('/cinema/films')
 def films():
     """Every film Jellyfin knows, sorted by title."""
-    page = Jellyfin().get_json('/Items', params={
-        'IncludeItemTypes': 'Movie', 'Recursive': 'true',
+    # userId makes Jellyfin include UserData (resume position, played).
+    jellyfin = Jellyfin()
+    page = jellyfin.get_json('/Items', params={
+        'userId': jellyfin.user_id, 'IncludeItemTypes': 'Movie', 'Recursive': 'true',
         'Fields': LIST_FIELDS, 'SortBy': 'SortName',
     })
     return [to_film(item) for item in page.get('Items', [])]
@@ -144,6 +146,26 @@ def hls(vid, rest):
         body = strip_api_key(upstream.text)
         return Response(body, status=upstream.status_code, content_type=PLAYLIST_TYPE)
     return proxied(upstream)
+
+
+@bp.route('/cinema/films/<item_id>/position', methods=['POST'])
+def position(item_id):
+    """Remember where a film was left, in Jellyfin's per-user data.
+
+    POST so navigator.sendBeacon can send it as the page goes away.
+    `finished` marks it played and clears the position, so the next visit
+    starts from the beginning.
+    """
+    seconds, = json_body('seconds')
+    finished = bool((request.get_json(silent=True) or {}).get('finished', False))
+    if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds < 0:
+        abort(400, description='seconds must be a non-negative number')
+    jellyfin = Jellyfin()
+    jellyfin.post_json(f'/UserItems/{item_id}/UserData', params={'userId': jellyfin.user_id}, body={
+        'PlaybackPositionTicks': 0 if finished else int(seconds * TICKS_PER_SECOND),
+        'Played': finished,
+    })
+    return '', 204
 
 
 @bp.route('/cinema/play/<session_id>/stop', methods=['POST'])

@@ -1,4 +1,4 @@
-import { listFilms, play, stop } from './api'
+import { listFilms, play, savePosition, stop } from './api'
 
 vi.mock('./device', () => ({ deviceId: () => 'dev-123' }))
 
@@ -61,4 +61,26 @@ test('a failed play rejects with the API message', async () => {
   vi.stubGlobal('fetch', respond(503, { error: 'Jellyfin is not reachable: refused' }))
 
   await expect(play('a')).rejects.toThrow('Jellyfin is not reachable')
+})
+
+test('savePosition beacons whole seconds and the finished flag', () => {
+  const sendBeacon = vi.fn(() => true)
+  vi.stubGlobal('navigator', { sendBeacon })
+  // jsdom's Blob cannot be read back; capture what went into it instead.
+  class CapturingBlob {
+    parts: string[]
+    type: string
+    constructor(parts: string[], opts: { type: string }) {
+      this.parts = parts
+      this.type = opts.type
+    }
+  }
+  vi.stubGlobal('Blob', CapturingBlob)
+
+  savePosition('a', 754.9, true)
+
+  const [url, blob] = sendBeacon.mock.calls[0] as unknown as [string, CapturingBlob]
+  expect(url).toBe('http://localhost:5000/api/cinema/films/a/position')
+  expect(blob.type).toBe('application/json')
+  expect(JSON.parse(blob.parts[0])).toEqual({ seconds: 754, finished: true })
 })

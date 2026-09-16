@@ -10,6 +10,8 @@ def to_film(item):
     source = sources[0] if sources else None
     video, audio = _streams(source) if source else (None, None)
     ticks = item.get('RunTimeTicks')
+    user_data = item.get('UserData') or {}
+    position = user_data.get('PlaybackPositionTicks') or 0
     return {
         'id': item['Id'],
         'title': item.get('Name') or '',
@@ -22,4 +24,6 @@ def to_film(item):
         'video_codec': (video or {}).get('Codec'),
         'audio_codec': (audio or {}).get('Codec'),
         'container': (source or {}).get('Container'),
+        'position_seconds': position // TICKS_PER_SECOND,
+        'played': bool(user_data.get('Played')),
     }

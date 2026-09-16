@@ -20,7 +20,7 @@ function renderAt(path: string) {
 test('the index is the grid', async () => {
   vi.mocked(listFilms).mockResolvedValue([{
     id: 'a', title: 'Paper Moon', year: 1973, runtime_seconds: 1, overview: '', genres: [],
-    has_poster: true, playback: 'remux', video_codec: 'h264', audio_codec: 'ac3', container: 'mkv',
+    has_poster: true, playback: 'remux', video_codec: 'h264', audio_codec: 'ac3', container: 'mkv', position_seconds: 0, played: false,
   }])
   renderAt('/cinema')
 

@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 
 import VideoPlayer from './VideoPlayer'
 
@@ -82,4 +82,69 @@ test('a fatal hls error shows one line under the video', () => {
   act(() => instances[0].handlers['hlsError']('hlsError', { fatal: true, details: 'manifestLoadError' }))
 
   expect(getByRole('alert')).toHaveTextContent(/manifestLoadError/)
+})
+
+describe('resume and progress', () => {
+  function at(seconds: number) {
+    Object.defineProperty(video(), 'currentTime', { value: seconds, writable: true, configurable: true })
+  }
+
+  test('startAt seeks once the metadata is known', () => {
+    render(<VideoPlayer kind="direct" url="/api/cinema/films/a/file" onStop={() => {}} startAt={754} />)
+    at(0)
+
+    fireEvent(video(), new Event('loadedmetadata'))
+
+    expect(video().currentTime).toBe(754)
+  })
+
+  test('pausing reports the position', () => {
+    const onProgress = vi.fn()
+    render(<VideoPlayer kind="direct" url="/api/cinema/films/a/file" onStop={() => {}} onProgress={onProgress} />)
+    at(120)
+
+    fireEvent(video(), new Event('pause'))
+
+    expect(onProgress).toHaveBeenCalledWith(120, false)
+  })
+
+  test('leaving reports the position, then stops', () => {
+    const calls: string[] = []
+    const { unmount } = render(
+      <VideoPlayer kind="direct" url="/api/cinema/films/a/file"
+        onStop={() => calls.push('stop')} onProgress={(s) => calls.push(`progress ${s}`)} />,
+    )
+    at(300)
+
+    unmount()
+
+    expect(calls).toEqual(['progress 300', 'stop'])
+  })
+
+  test('finishing reports done, and leaving afterwards does not overwrite it', () => {
+    const onProgress = vi.fn()
+    const { unmount } = render(<VideoPlayer kind="direct" url="/api/cinema/films/a/file" onStop={() => {}} onProgress={onProgress} />)
+    at(2700)
+
+    fireEvent(video(), new Event('ended'))
+    unmount()
+
+    expect(onProgress).toHaveBeenCalledTimes(1)
+    expect(onProgress).toHaveBeenCalledWith(0, true)
+  })
+
+  test('timeupdate reports at most every half minute', () => {
+    vi.useFakeTimers()
+    const onProgress = vi.fn()
+    render(<VideoPlayer kind="direct" url="/api/cinema/films/a/file" onStop={() => {}} onProgress={onProgress} />)
+    at(10)
+
+    fireEvent(video(), new Event('timeupdate'))
+    fireEvent(video(), new Event('timeupdate'))
+    vi.advanceTimersByTime(31_000)
+    fireEvent(video(), new Event('timeupdate'))
+
+    expect(onProgress).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
 })

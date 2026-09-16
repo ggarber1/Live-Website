@@ -96,6 +96,7 @@ class TestListing:
         assert path == '/Items'
         assert params['IncludeItemTypes'] == 'Movie'
         assert 'MediaSources' in params['Fields']
+        assert params['userId'] == 'user-1', 'without userId there is no UserData, so no resume'
 
     def test_one_film(self, client, jellyfin):
         res = client.get(f'/api/cinema/films/{DIRECT_ID}')
@@ -234,6 +235,29 @@ class TestFile:
         assert path == f'/Videos/{DIRECT_ID}/stream'
         assert range_header == 'bytes=0-99'
         assert params == {'static': 'true', 'mediaSourceId': DIRECT_ID}
+
+
+class TestPosition:
+    def test_saves_the_position_as_ticks_for_the_user(self, client, jellyfin):
+        res = client.post(f'/api/cinema/films/{REMUX_ID}/position', json={'seconds': 754.4})
+
+        assert res.status_code == 204
+        assert jellyfin['calls'] == [('POST', f'/UserItems/{REMUX_ID}/UserData',
+                                      {'PlaybackPositionTicks': 7_544_000_000, 'Played': False},
+                                      {'userId': 'user-1'})]
+
+    def test_finished_marks_played_and_clears_the_position(self, client, jellyfin):
+        client.post(f'/api/cinema/films/{REMUX_ID}/position', json={'seconds': 2700, 'finished': True})
+
+        _, _, body, _ = jellyfin['calls'][0]
+        assert body == {'PlaybackPositionTicks': 0, 'Played': True}
+
+    @pytest.mark.parametrize('body', [{}, {'seconds': -1}, {'seconds': 'ten'}, {'seconds': True}])
+    def test_bad_input_is_a_400_before_any_request(self, client, jellyfin, body):
+        res = client.post(f'/api/cinema/films/{REMUX_ID}/position', json=body)
+
+        assert res.status_code == 400
+        assert jellyfin['calls'] == []
 
 
 class TestStop:

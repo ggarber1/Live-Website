@@ -12,12 +12,13 @@ vi.mock('./api', async (importOriginal) => ({
 }))
 const pause = vi.fn()
 vi.mock('../music/player-context', () => ({ usePlayer: () => ({ playing: null, play: () => {}, pause }) }))
-vi.mock('./VideoPlayer', () => ({ default: (p: { kind: string; url: string }) => <div data-testid="player">{p.kind} {p.url}</div> }))
+vi.mock('./VideoPlayer', () => ({ default: (p: { kind: string; url: string; startAt?: number }) => <div data-testid="player">{p.kind} {p.url} from {p.startAt ?? 0}</div> }))
 
 const soup: Film = {
   id: 'a', title: 'Paper Moon', year: 1973, runtime_seconds: 6120,
   overview: 'A con man.\n\nAnd a girl.', genres: ['Comedy', 'Drama'], has_poster: true,
   playback: 'remux', video_codec: 'h264', audio_codec: 'ac3', container: 'mkv',
+  position_seconds: 0, played: false,
 }
 
 function renderAt(id = 'a') {
@@ -49,7 +50,7 @@ test('play asks the API, then shows the player in place of the poster', async ()
   renderAt()
   await userEvent.click(await screen.findByRole('button', { name: 'Play' }))
 
-  expect(await screen.findByTestId('player')).toHaveTextContent('hls /api/cinema/videos/x/master.m3u8')
+  expect(await screen.findByTestId('player')).toHaveTextContent('hls /api/cinema/videos/x/master.m3u8 from 0')
   expect(play).toHaveBeenCalledWith('a')
   expect(screen.queryByRole('img', { name: /Paper Moon/ })).not.toBeInTheDocument()
 })
@@ -82,4 +83,41 @@ test('an unknown film shows the error', async () => {
   renderAt('zzz')
 
   expect(await screen.findByRole('alert')).toHaveTextContent('no such film')
+})
+
+describe('resume', () => {
+  test('a film left part-way offers resume and start over', async () => {
+    vi.mocked(getFilm).mockResolvedValue({ ...soup, position_seconds: 754 })
+    renderAt()
+
+    expect(await screen.findByRole('button', { name: 'Resume from 12:34' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
+  })
+
+  test('resume starts the player at the saved position', async () => {
+    vi.mocked(getFilm).mockResolvedValue({ ...soup, position_seconds: 754 })
+    renderAt()
+    await userEvent.click(await screen.findByRole('button', { name: /Resume/ }))
+
+    expect(await screen.findByTestId('player')).toHaveTextContent('from 754')
+  })
+
+  test('start over starts from the beginning', async () => {
+    vi.mocked(getFilm).mockResolvedValue({ ...soup, position_seconds: 754 })
+    renderAt()
+    await userEvent.click(await screen.findByRole('button', { name: 'Start over' }))
+
+    expect(await screen.findByTestId('player')).toHaveTextContent('from 0')
+  })
+
+  test('a finished film or one barely started just offers Play', async () => {
+    vi.mocked(getFilm).mockResolvedValue({ ...soup, position_seconds: 754, played: true })
+    renderAt()
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeInTheDocument()
+
+    vi.mocked(getFilm).mockResolvedValue({ ...soup, position_seconds: 20 })
+    renderAt()
+    expect((await screen.findAllByRole('button', { name: 'Play' })).length).toBeGreaterThan(0)
+  })
 })

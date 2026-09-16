@@ -7,7 +7,7 @@ import FilmGrid from './FilmGrid'
 function film(id: string, extra: Partial<Film> = {}): Film {
   return {
     id, title: `Film ${id}`, year: 1973, runtime_seconds: 6120, overview: 'x', genres: [],
-    has_poster: true, playback: 'remux', video_codec: 'h264', audio_codec: 'ac3', container: 'mkv', ...extra,
+    has_poster: true, playback: 'remux', video_codec: 'h264', audio_codec: 'ac3', container: 'mkv', position_seconds: 0, played: false, ...extra,
   }
 }
 

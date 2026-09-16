@@ -29,6 +29,8 @@ def test_maps_the_recorded_remux_film():
         'video_codec': 'h264',
         'audio_codec': 'ac3',
         'container': 'mkv',
+        'position_seconds': 0,
+        'played': False,
     }
     assert film['overview'].startswith('During the Great Depression')
     assert 'Comedy' in film['genres']
@@ -56,3 +58,18 @@ def test_missing_fields_degrade_rather_than_crash():
     assert film['has_poster'] is False
     assert film['playback'] == 'unknown'
     assert (film['video_codec'], film['audio_codec'], film['container']) == (None, None, None)
+
+
+def test_user_data_becomes_position_and_played():
+    item = {'Id': 'x', 'UserData': {'PlaybackPositionTicks': 754_000_000_000, 'Played': True}}
+
+    film = to_film(item)
+
+    assert film['position_seconds'] == 75400
+    assert film['played'] is True
+
+
+def test_no_user_data_means_unwatched():
+    film = to_film({'Id': 'x'})
+
+    assert (film['position_seconds'], film['played']) == (0, False)

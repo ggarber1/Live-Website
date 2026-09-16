@@ -15,6 +15,8 @@ export interface Film {
   video_codec: string | null
   audio_codec: string | null
   container: string | null
+  position_seconds: number
+  played: boolean
 }
 
 export interface Playback {
@@ -42,8 +44,17 @@ export function posterUrl(id: string, width = 300): string {
 // Fired on unmount and on pagehide, so it must survive the page going away.
 // sendBeacon is built for exactly that; keepalive fetch is the fallback.
 export function stop(playSessionId: string): void {
-  const url = `${BASE}/api/cinema/play/${playSessionId}/stop`
-  const body = JSON.stringify({ device_id: deviceId() })
+  beacon(`${BASE}/api/cinema/play/${playSessionId}/stop`, { device_id: deviceId() })
+}
+
+// Where the film was left. Sent as the page goes away as well as on pause,
+// so it goes by beacon like stop().
+export function savePosition(id: string, seconds: number, finished = false): void {
+  beacon(`${BASE}/api/cinema/films/${id}/position`, { seconds: Math.floor(seconds), finished })
+}
+
+function beacon(url: string, payload: unknown): void {
+  const body = JSON.stringify(payload)
   if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
     navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))
     return

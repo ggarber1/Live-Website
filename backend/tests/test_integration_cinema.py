@@ -115,3 +115,19 @@ def test_the_poster_is_a_real_image(live, films):
     assert res.status_code == 200
     assert res.mimetype == 'image/jpeg'
     assert res.data[:2] == b'\xff\xd8'
+
+
+def test_the_position_round_trips_through_jellyfin(live, films):
+    film_id = films['Paper Moon']['id']
+    try:
+        assert live.post(f'/api/cinema/films/{film_id}/position', json={'seconds': 20}).status_code == 204
+
+        assert live.get(f'/api/cinema/films/{film_id}').get_json()['position_seconds'] == 20
+        listed = {f['title']: f for f in live.get('/api/cinema/films').get_json()}
+        assert listed['Paper Moon']['position_seconds'] == 20
+
+        live.post(f'/api/cinema/films/{film_id}/position', json={'seconds': 40, 'finished': True})
+        film = live.get(f'/api/cinema/films/{film_id}').get_json()
+        assert (film['position_seconds'], film['played']) == (0, True)
+    finally:
+        live.post(f'/api/cinema/films/{film_id}/position', json={'seconds': 0})
