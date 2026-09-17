@@ -12,9 +12,8 @@ export const GREETINGS = [
   'Yo.',
 ]
 
-const LINES = [
+export const NOTES = [
   'What are we up to today?',
-  'Tea first. Then the list.',
   'No rush on any of it.',
   "Let's see what's on.",
   'Something small today, maybe.',
@@ -56,5 +55,5 @@ export function isBirthday(now: Date): boolean {
 
 export function noteOfTheDay(now: Date): string {
   if (isBirthday(now)) return 'Happy Birthdayyy!!!'
-  return LINES[dayOfYear(now) % LINES.length]
+  return NOTES[dayOfYear(now) % NOTES.length]
 }

@@ -1,4 +1,4 @@
-import { dateLine, GREETINGS, isBirthday, nextGreeting, noteOfTheDay } from './greeting'
+import { dateLine, GREETINGS, isBirthday, nextGreeting, noteOfTheDay, NOTES } from './greeting'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -36,7 +36,11 @@ test('the note changes with the day and repeats after the list', () => {
   const a = noteOfTheDay(new Date(2026, 8, 16))
   const b = noteOfTheDay(new Date(2026, 8, 17))
   expect(a).not.toBe(b)
-  expect(noteOfTheDay(new Date(2026, 8, 23))).toBe(a)
+  expect(noteOfTheDay(new Date(2026, 8, 16 + NOTES.length))).toBe(a)
+})
+
+test('the tea line is gone', () => {
+  expect(NOTES).not.toContain('Tea first. Then the list.')
 })
 
 describe('her birthday', () => {
