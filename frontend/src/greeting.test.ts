@@ -1,4 +1,4 @@
-import { dateLine, GREETINGS, isBirthday, nextGreeting, noteOfTheDay, NOTES } from './greeting'
+import { dateLine, GREETINGS, isBirthday, nextGreeting, noteOfTheDay } from './greeting'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -32,15 +32,8 @@ test('the date line reads like speech', () => {
   expect(dateLine(new Date(2026, 8, 16, 9))).toBe("It's Wednesday, 16 September.")
 })
 
-test('the note changes with the day and repeats after the list', () => {
-  const a = noteOfTheDay(new Date(2026, 8, 16))
-  const b = noteOfTheDay(new Date(2026, 8, 17))
-  expect(a).not.toBe(b)
-  expect(noteOfTheDay(new Date(2026, 8, 16 + NOTES.length))).toBe(a)
-})
-
-test('the tea line is gone', () => {
-  expect(NOTES).not.toContain('Tea first. Then the list.')
+test('there is no note on an ordinary day', () => {
+  expect(noteOfTheDay(new Date(2026, 8, 16))).toBeNull()
 })
 
 describe('her birthday', () => {
@@ -51,8 +44,8 @@ describe('her birthday', () => {
   })
 
   test('the day before and after are ordinary', () => {
-    expect(noteOfTheDay(new Date(2026, 8, 26))).not.toBe('Happy Birthdayyy!!!')
-    expect(noteOfTheDay(new Date(2026, 8, 28))).not.toBe('Happy Birthdayyy!!!')
+    expect(noteOfTheDay(new Date(2026, 8, 26))).toBeNull()
+    expect(noteOfTheDay(new Date(2026, 8, 28))).toBeNull()
     expect(isBirthday(new Date(2026, 9, 27))).toBe(false) // 27 October is not it
   })
 })

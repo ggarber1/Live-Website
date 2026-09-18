@@ -33,7 +33,7 @@ export default function Home() {
     <>
       <div className="hello">
         <h1>{hello} <span className="ornament" aria-hidden="true">❦</span></h1>
-        <p className="subtitle">{dateLine(now)} {noteOfTheDay(now)}</p>
+        <p className="subtitle">{[dateLine(now), noteOfTheDay(now)].filter(Boolean).join(' ')}</p>
       </div>
       {photos.length > 0 && (
         <section className="photo-band" aria-label="Recent photos">

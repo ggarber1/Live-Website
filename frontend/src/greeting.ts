@@ -12,15 +12,6 @@ export const GREETINGS = [
   'Yo.',
 ]
 
-export const NOTES = [
-  'What are we up to today?',
-  'No rush on any of it.',
-  "Let's see what's on.",
-  'Something small today, maybe.',
-  'The fern says hello.',
-  'Whatever today turns into.',
-]
-
 const KEY = 'livs-greeting'
 
 function dayOfYear(now: Date): number {
@@ -46,14 +37,13 @@ export function dateLine(now: Date): string {
   return `It's ${weekday}, ${day} ${month}.`
 }
 
-// Liv's birthday: 27 September. That day the note is not on the rota.
+// Liv's birthday: 27 September. The only day the date line gets a second sentence.
 const BIRTHDAY = { month: 8, day: 27 } // months are zero-based
 
 export function isBirthday(now: Date): boolean {
   return now.getMonth() === BIRTHDAY.month && now.getDate() === BIRTHDAY.day
 }
 
-export function noteOfTheDay(now: Date): string {
-  if (isBirthday(now)) return 'Happy Birthdayyy!!!'
-  return NOTES[dayOfYear(now) % NOTES.length]
+export function noteOfTheDay(now: Date): string | null {
+  return isBirthday(now) ? 'Happy Birthdayyy!!!' : null
 }
