@@ -68,8 +68,16 @@ if [ -n "${DEV:-}" ] && ! mountpoint -q $MEDIA; then
     log "formatting $DEV (it has no filesystem)"
     mkfs.ext4 -q -L media "$DEV"
   fi
-  UUID=$(blkid -s UUID -o value "$DEV")
-  grep -q "$UUID" /etc/fstab || echo "UUID=$UUID $MEDIA ext4 defaults,nofail 0 2" >> /etc/fstab
+  # A fresh filesystem's UUID can take a moment to appear in blkid.
+  UUID=""
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    udevadm settle 2>/dev/null || true
+    UUID=$(blkid -s UUID -o value "$DEV" || true)
+    [ -n "$UUID" ] && break
+    sleep 1
+  done
+  [ -n "$UUID" ] || die "no UUID for $DEV after formatting"
+  grep -q "UUID=$UUID" /etc/fstab || echo "UUID=$UUID $MEDIA ext4 defaults,nofail 0 2" >> /etc/fstab
   mount $MEDIA
 fi
 mkdir -p $MEDIA/music $MEDIA/films $MEDIA/photos $MEDIA/backups
