@@ -8,6 +8,8 @@
 
 **Tech Stack:** as before, plus Caddy. `werkzeug.security` for the password hash (already a dependency via Flask). AWS CLI with `--profile personal` for every call; the default profile is a dead work credential and is never used.
 
+**STATUS, 2026-09-21: Tasks 1-4 done; the site is live at https://livs.greggarber.net behind the login, empty, with a temporary random household password (in `~/.ssh/livs-temp-password.txt` on Greg's Mac) to be replaced with Greg's choice. Jellyfin is set up and bound to loopback (`~/.ssh/livs-jellyfin-password.txt` holds its admin password). Task 5 (media) and Task 6 (a phone on cellular) remain.** Resource ids: `deploy/aws.md`. Four script fixes came out of the first real run and are committed: the UUID race after mkfs, the root-disk trap in the device finder, Node 22, and not sourcing `.env`. One tooling lesson: `ssh` inside a heredoc script eats the rest of the script as stdin; use `ssh -n`.
+
 Spec context: `docs/superpowers/specs/2026-09-09-media-library-design.md` Phase 3 (the auth boundary and "Jellyfin behind the proxy" parts apply; Route 53 dynamic DNS and the CGNAT question do not, since an Elastic IP is static).
 
 ---
@@ -46,35 +48,35 @@ Spec context: `docs/superpowers/specs/2026-09-09-media-library-design.md` Phase 
 
 **Files:** `backend/auth/auth.py`, `backend/auth/guard.py`, `backend/app.py`, `backend/tests/test_auth.py`, `backend/tests/conftest.py` (a logged-in `client` for every existing test), `.env.example`.
 
-- [ ] Failing tests: `hash-password` prints a hash `check_password_hash` accepts; login with the right password sets a cookie and 204; wrong is 401 with no cookie; five wrong then 429 even with the right one, and the sixth right one after 30 s (fake clock) succeeds; `/me` reports both states; logout clears; without a cookie `GET /api/todo` is 401 JSON, `GET /` is 200 HTML, `GET /api/auth/me` is 200; with a cookie `/api/todo` is 200; missing `SITE_PASSWORD_HASH` makes login 503 with a message rather than letting everyone in; cookie flags (`HttpOnly`, `SameSite=Lax`, `Secure` only with `SITE_HTTPS=1`).
-- [ ] The existing suite: `conftest.client` logs in first (sets the session directly, no password round trip), so 400-odd tests keep meaning what they meant. One new test asserts the raw client is refused, so the guard is proven load-bearing.
-- [ ] Implement. `guard.py` registers `before_request` on the app; `auth.py` is the blueprint and the CLI command.
-- [ ] Commit — `feat(auth): one password in front of the API`
+- [x] Failing tests: `hash-password` prints a hash `check_password_hash` accepts; login with the right password sets a cookie and 204; wrong is 401 with no cookie; five wrong then 429 even with the right one, and the sixth right one after 30 s (fake clock) succeeds; `/me` reports both states; logout clears; without a cookie `GET /api/todo` is 401 JSON, `GET /` is 200 HTML, `GET /api/auth/me` is 200; with a cookie `/api/todo` is 200; missing `SITE_PASSWORD_HASH` makes login 503 with a message rather than letting everyone in; cookie flags (`HttpOnly`, `SameSite=Lax`, `Secure` only with `SITE_HTTPS=1`).
+- [x] The existing suite: `conftest.client` logs in first (sets the session directly, no password round trip), so 400-odd tests keep meaning what they meant. One new test asserts the raw client is refused, so the guard is proven load-bearing.
+- [x] Implement. `guard.py` registers `before_request` on the app; `auth.py` is the blueprint and the CLI command.
+- [x] Commit — `feat(auth): one password in front of the API`
 
 ### Task 2: Login (frontend)
 
 **Files:** `src/auth/api.ts`, `src/auth/LoginPage.tsx`, `src/http.ts` (401 → `/login?next=`), `src/App.tsx`, `src/Layout.tsx` (a quiet "log out"), tests, styles.
 
-- [ ] Failing tests: a 401 from `request()` sends the browser to `/login?next=<current path>` and rejects; the login page posts the password, then goes to `next` (or `/`); a wrong password shows one line and keeps the field; a 429 shows "try again in a moment"; the nav has a log out that posts and goes to `/login`.
-- [ ] Implement. The page is the paper look at its smallest: the site name, "It's you, isn't it?", one field, one button. No username field.
-- [ ] Commit — `feat(auth): the login page`
+- [x] Failing tests: a 401 from `request()` sends the browser to `/login?next=<current path>` and rejects; the login page posts the password, then goes to `next` (or `/`); a wrong password shows one line and keeps the field; a 429 shows "try again in a moment"; the nav has a log out that posts and goes to `/login`.
+- [x] Implement. The page is the paper look at its smallest: the site name, "It's you, isn't it?", one field, one button. No username field.
+- [x] Commit — `feat(auth): the login page`
 
 ### Task 3: Provisioning script and Caddy
 
 **Files:** `deploy/provision.sh`, `deploy/Caddyfile`, `deploy/livs-*.service` (paths and user parametrised via `LIVS_USER`/`LIVS_HOME`), `deploy/backup.sh` + timer, `deploy/README.md` (an "On AWS" section that is mostly "run provision.sh").
 
-- [ ] `provision.sh` is idempotent and run as root on a fresh Ubuntu 24.04: apt packages (mariadb-server, libmariadb-dev, python3-venv, build-essential, nodejs, npm, ffmpeg, caddy, jellyfin from its repo); format and mount the media volume at `/mnt/media` (only if unformatted; `fstab` by UUID); `music`, `films`, `photos` subdirectories owned by the app user, `films` readable by `jellyfin`; the repo cloned to `/opt/livs`; venv, `npm ci && npm run build`; `.env` written from prompts or environment (DB password generated, `SECRET_KEY` generated, `SITE_PASSWORD_HASH` from a prompt); MariaDB database and user; `init-db`; Jellyfin bound to loopback; systemd units installed and started; Caddyfile with the domain; ufw allowing 22, 80, 443.
-- [ ] Test what can be tested: `bash -n`, shellcheck if present, and a dry run of the fstab/UUID and `.env` generation functions with `LIVS_DRY_RUN=1`.
-- [ ] Commit — `feat(deploy): provision an Ubuntu host end to end`
+- [x] `provision.sh` is idempotent and run as root on a fresh Ubuntu 24.04: apt packages (mariadb-server, libmariadb-dev, python3-venv, build-essential, nodejs, npm, ffmpeg, caddy, jellyfin from its repo); format and mount the media volume at `/mnt/media` (only if unformatted; `fstab` by UUID); `music`, `films`, `photos` subdirectories owned by the app user, `films` readable by `jellyfin`; the repo cloned to `/opt/livs`; venv, `npm ci && npm run build`; `.env` written from prompts or environment (DB password generated, `SECRET_KEY` generated, `SITE_PASSWORD_HASH` from a prompt); MariaDB database and user; `init-db`; Jellyfin bound to loopback; systemd units installed and started; Caddyfile with the domain; ufw allowing 22, 80, 443.
+- [x] Test what can be tested: `bash -n`, shellcheck if present, and a dry run of the fstab/UUID and `.env` generation functions with `LIVS_DRY_RUN=1`.
+- [x] Commit — `feat(deploy): provision an Ubuntu host end to end`
 
 ### Task 4: The instance
 
 All with `aws --profile personal --region us-west-2`. Each resource tagged `Project=livs` so they are easy to find and to delete.
 
-- [ ] Key pair `livs` (private key saved to `~/.ssh/livs.pem`, 600), security group, `t3.small` from the latest Ubuntu 24.04 AMI, 16 GB root, a 100 GB gp3 media volume attached as `/dev/sdf`, Elastic IP, Route 53 `A livs.greggarber.net → EIP`.
-- [ ] ssh in, `git clone`, run `provision.sh` with the domain and the password. Watch Caddy get its certificate.
-- [ ] Snapshot policy for the media volume; the backup timer.
-- [ ] Commit nothing (no code); record the resource ids in `deploy/aws.md`.
+- [x] Key pair `livs` (private key saved to `~/.ssh/livs.pem`, 600), security group, `t3.small` from the latest Ubuntu 24.04 AMI, 16 GB root, a 100 GB gp3 media volume attached as `/dev/sdf`, Elastic IP, Route 53 `A livs.greggarber.net → EIP`.
+- [x] ssh in, `git clone`, run `provision.sh` with the domain and the password. Watch Caddy get its certificate.
+- [x] Snapshot policy for the media volume; the backup timer.
+- [x] Commit nothing (no code); record the resource ids in `deploy/aws.md`.
 
 ### Task 5: Media and Jellyfin
 

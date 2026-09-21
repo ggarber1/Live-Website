@@ -21,7 +21,10 @@ household password, creates the database, binds Jellyfin to loopback,
 installs the units, and points Caddy at the domain. Re-run it after a `git
 pull` to rebuild and restart. Then: rsync media in, `scan-music`,
 `scan-photos`, and set up Jellyfin through an ssh tunnel with
-`scripts/jellyfin-dev.sh /mnt/media/films`.
+`scripts/jellyfin-dev.sh /mnt/media/films` (run it on the host itself with
+`JELLYFIN_URL=http://127.0.0.1:8096`), paste the two values into `.env`, and
+re-run `provision.sh`: Jellyfin only writes its network file after the wizard,
+so the loopback binding takes effect on that second run.
 
 The app runs as the system user `livs` from `/opt/livs`; gunicorn listens
 on `127.0.0.1:5000` and only Caddy talks to it. A nightly `mysqldump` lands
