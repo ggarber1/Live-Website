@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 
+import { logout } from './auth/api'
 import Layout from './Layout'
+
+vi.mock('./auth/api', () => ({ logout: vi.fn().mockResolvedValue(undefined) }))
 
 function renderAt(path: string) {
   return render(
@@ -43,4 +47,16 @@ test('the site name links home and renders the page body', () => {
 
   expect(screen.getByRole('link', { name: /Liv/ })).toHaveAttribute('href', '/')
   expect(screen.getByText('page body')).toBeInTheDocument()
+})
+
+test('log out posts, then goes to the login page', async () => {
+  const assign = vi.fn()
+  vi.stubGlobal('location', { pathname: '/todo', search: '', assign })
+  renderAt('/todo')
+
+  await userEvent.click(screen.getByRole('button', { name: /log out/i }))
+
+  expect(logout).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/login'))
+  vi.unstubAllGlobals()
 })

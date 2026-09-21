@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
+import LoginPage from './auth/LoginPage'
 import HabitsPage from './habits/HabitsPage'
 import Home from './Home'
 import BlogPage from './blog/BlogPage'
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="login" element={<LoginPage />} />
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="music" element={<MusicPage />} />

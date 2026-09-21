@@ -931,3 +931,52 @@ textarea.field {
     display: none;
   }
 }
+
+/* -------------------------------------------------------------- login */
+
+.login {
+  min-height: 80vh;
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: min(100%, 22rem);
+  text-align: center;
+}
+
+.login-card .site-name {
+  display: block;
+  margin: 0 0 0.25rem;
+  padding: 0;
+}
+
+.login-card h1 {
+  font-size: 1.4rem;
+  font-weight: 400;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+.login-card label {
+  display: block;
+  text-align: left;
+}
+
+.login-card .actions {
+  justify-content: center;
+}
+
+.nav-quiet {
+  font: inherit;
+  font-style: italic;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  padding: 0.25rem 0 0.6rem;
+  cursor: pointer;
+}
+
+.nav-quiet:hover {
+  color: var(--ink);
+}

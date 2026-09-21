@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router'
 
+import { logout } from './auth/api'
+
 import { PlayerProvider } from './music/queue'
 
 const SECTIONS: [string, string][] = [
@@ -23,6 +25,13 @@ export default function Layout() {
           {SECTIONS.map(([label, to]) => (
             <NavLink key={to} to={to}>{label}</NavLink>
           ))}
+          <button
+            type="button"
+            className="nav-quiet"
+            onClick={() => logout().then(() => window.location.assign('/login'))}
+          >
+            log out
+          </button>
         </nav>
       </header>
       <main>

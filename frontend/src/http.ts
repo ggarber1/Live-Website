@@ -9,6 +9,10 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     ...init,
     headers: typeof init.body === 'string' ? { 'Content-Type': 'application/json', ...init.headers } : init.headers,
   })
+  if (res.status === 401) {
+    sendToLogin()
+    throw new Error('log in first')
+  }
   if (!res.ok) throw new Error(await errorMessage(res))
   if (res.status === 204) return undefined as T
   return res.json()
@@ -28,4 +32,13 @@ async function errorMessage(res: Response): Promise<string> {
     // not JSON
   }
   return res.statusText || `request failed with status ${res.status}`
+}
+
+// Anything the API refuses for want of a session becomes a visit to the
+// login page, which comes back here afterwards. Not from the login page
+// itself, or a wrong password would loop.
+export function sendToLogin(): void {
+  const here = window.location.pathname + window.location.search
+  if (here.startsWith('/login')) return
+  window.location.assign(`/login?next=${encodeURIComponent(here)}`)
 }
