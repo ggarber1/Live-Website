@@ -235,3 +235,45 @@ def test_reads_id3_tags_from_a_wav_file(tmp_path):
 
     assert tags == {'title': 'Song', 'artist': 'Band', 'album': 'Record',
                     'track_no': 3, 'duration_seconds': 1}
+
+
+class TestFilenameFallback:
+    def test_an_untagged_artist_dash_title_name_is_split(self, tmp_path):
+        path = tmp_path / 'Ariana Grande - petal.mp3'
+        path.write_bytes(b'not really an mp3')
+
+        tags = read_tags(str(path))
+
+        assert (tags['artist'], tags['title']) == ('Ariana Grande', 'petal')
+
+    def test_only_the_first_dash_splits(self, tmp_path):
+        path = tmp_path / 'Taylor Swift - I Knew It - live.mp3'
+        path.write_bytes(b'x')
+
+        tags = read_tags(str(path))
+
+        assert (tags['artist'], tags['title']) == ('Taylor Swift', 'I Knew It - live')
+
+    def test_a_name_without_the_pattern_stays_the_title(self, tmp_path):
+        path = tmp_path / 'Some Song.mp3'
+        path.write_bytes(b'x')
+
+        tags = read_tags(str(path))
+
+        assert (tags['artist'], tags['title']) == (None, 'Some Song')
+
+    def test_a_dash_with_nothing_either_side_is_not_split(self, tmp_path):
+        path = tmp_path / ' - .mp3'
+        path.write_bytes(b'x')
+
+        assert read_tags(str(path))['artist'] is None
+
+    def test_real_tags_are_never_overridden_by_the_name(self, tagged, tmp_path):
+        """A tagged file named "Wrong - Wrong.mp3" keeps its tags."""
+        tagged({'title': ['Right Title'], 'artist': ['Right Artist']})
+        path = tmp_path / 'Wrong - Wrong.mp3'
+        path.write_bytes(b'x')
+
+        tags = read_tags(str(path))
+
+        assert (tags['artist'], tags['title']) == ('Right Artist', 'Right Title')

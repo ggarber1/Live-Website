@@ -59,7 +59,7 @@ def _skip(counts, reason):
 
 
 def scan(root, extensions, table, noun, variable, read, insert, update,
-         fetch_all, execute, force_removals=False):
+         fetch_all, execute, force_removals=False, reread=False):
     """Index `root` into `table`. Returns the nine counts.
 
     `read(path)` returns the metadata to store, or None to skip the file as
@@ -104,7 +104,7 @@ def scan(root, extensions, table, noun, variable, read, insert, update,
             continue
 
         row = indexed.get(path)
-        if (row is not None
+        if (row is not None and not reread
                 and row['size_bytes'] == stat.st_size
                 and row['mtime_ns'] == stat.st_mtime_ns):
             counts['unchanged'] += 1
@@ -149,7 +149,7 @@ def scan(root, extensions, table, noun, variable, read, insert, update,
     return counts
 
 
-def run_scan_command(scan_fn, force_removals):
+def run_scan_command(scan_fn, force_removals, reread=False):
     """The CLI half every scan command shares: print counts, set the exit code.
 
     A refused scan and a knowingly stale index both exit non-zero, because
@@ -158,7 +158,7 @@ def run_scan_command(scan_fn, force_removals):
     broken file must not fail a nightly run forever.
     """
     try:
-        counts = scan_fn(force_removals=force_removals)
+        counts = scan_fn(force_removals=force_removals, reread=reread)
     except ScanAborted as err:
         raise click.ClickException(str(err))
 

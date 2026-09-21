@@ -661,7 +661,7 @@ class TestScanMusicCommand:
 
         seen = {}
 
-        def fake_scan(force_removals=False):
+        def fake_scan(force_removals=False, reread=False):
             seen['force_removals'] = force_removals
             if error is not None:
                 raise error
@@ -765,3 +765,16 @@ class TestScanMusicCommand:
         _, seen = self._run(monkeypatch, args=['--force-removals'])
 
         assert seen['force_removals'] is True
+
+
+def test_reread_updates_unchanged_files(library, fake_db, monkeypatch):
+    """A better tag reader must be able to reach files already indexed."""
+    path = write_audio(library, 'a.mp3')
+    stat = os.stat(path)
+    fake_db['rows'] = [{'id': 3, 'path': str(path), 'size_bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns}]
+
+    assert scanner.scan_music()['unchanged'] == 1
+    counts = scanner.scan_music(reread=True)
+
+    assert counts['updated'] == 1
+    assert any(w[0] == 'execute' and 'UPDATE track' in w[1] for w in fake_db['writes'])

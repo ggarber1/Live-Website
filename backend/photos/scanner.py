@@ -37,20 +37,23 @@ def _update_photo(photo_id, path, meta, stat):
     ))
 
 
-def scan_photos(force_removals=False):
+def scan_photos(force_removals=False, reread=False):
     """Index PHOTOS_DIR into the photo table. See library.scan.scan."""
     return scan(
         root=photos_dir(), extensions=IMAGE_EXTENSIONS, table='photo',
         noun='image', variable='PHOTOS_DIR', read=read_image,
         insert=_insert_photo, update=_update_photo,
         fetch_all=fetch_all, execute=execute, force_removals=force_removals,
+        reread=reread,
     )
 
 
 @click.command('scan-photos')
 @click.option('--force-removals', is_flag=True,
               help="Delete stale rows even when that would gut the table.")
+@click.option('--reread', is_flag=True,
+              help="Re-read metadata for every file, not just changed ones.")
 @with_appcontext
-def scan_photos_command(force_removals):
+def scan_photos_command(force_removals, reread):
     """Index PHOTOS_DIR into the photo table."""
-    run_scan_command(scan_photos, force_removals)
+    run_scan_command(scan_photos, force_removals, reread)

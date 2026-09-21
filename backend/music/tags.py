@@ -98,6 +98,13 @@ def read_tags(path):
     # ever drops below 255 because the column narrowed.
     fallback = os.path.splitext(os.path.basename(path))[0][:MAX_TEXT_LENGTH]
 
+    # Untagged downloads are usually named "Artist - Title". With no tags at
+    # all, that is better than a title with a dash in it and no artist.
+    if title is None and artist is None and ' - ' in fallback:
+        left, right = fallback.split(' - ', 1)
+        if left.strip() and right.strip():
+            artist, fallback = left.strip(), right.strip()
+
     return {
         'title': title or fallback,
         'artist': artist,

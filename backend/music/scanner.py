@@ -55,7 +55,7 @@ def _update_track(track_id, path, tags, stat):
     ))
 
 
-def scan_music(force_removals=False):
+def scan_music(force_removals=False, reread=False):
     """Index MUSIC_DIR into the track table. See library.scan.scan.
 
     The database and tag functions are looked up here at call time so the
@@ -66,13 +66,16 @@ def scan_music(force_removals=False):
         noun='audio', variable='MUSIC_DIR', read=read_tags,
         insert=_insert_track, update=_update_track,
         fetch_all=fetch_all, execute=execute, force_removals=force_removals,
+        reread=reread,
     )
 
 
 @click.command('scan-music')
 @click.option('--force-removals', is_flag=True,
               help="Delete stale rows even when that would gut the table.")
+@click.option('--reread', is_flag=True,
+              help="Re-read metadata for every file, not just changed ones.")
 @with_appcontext
-def scan_music_command(force_removals):
+def scan_music_command(force_removals, reread):
     """Index MUSIC_DIR into the track table."""
-    run_scan_command(scan_music, force_removals)
+    run_scan_command(scan_music, force_removals, reread)
