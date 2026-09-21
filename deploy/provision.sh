@@ -145,7 +145,9 @@ if ! grep -q '^SITE_PASSWORD_HASH=.\+' $ENV_FILE; then
 fi
 
 log "database"
-set -a; . $ENV_FILE; set +a
+# Not sourced: the password hash contains $ signs the shell would expand.
+env_value() { grep "^$1=" $ENV_FILE | head -1 | cut -d= -f2-; }
+DB_USER=$(env_value DB_USER); DB_PASSWORD=$(env_value DB_PASSWORD); DB_NAME=$(env_value DB_NAME)
 mysql -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD'; ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD'; GRANT ALL ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost'; FLUSH PRIVILEGES;"
 (cd $LIVS_HOME/backend && sudo -u $LIVS_USER ./venv/bin/flask --app app init-db)
