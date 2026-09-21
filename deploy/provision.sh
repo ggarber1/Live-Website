@@ -55,7 +55,13 @@ log "packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y -q mariadb-server libmariadb-dev python3-venv python3-dev build-essential \
-  nodejs npm ffmpeg git curl debian-keyring debian-archive-keyring apt-transport-https ufw
+  ffmpeg git curl debian-keyring debian-archive-keyring apt-transport-https ufw
+# Ubuntu's packaged Node is 18; the frontend build needs 20 or newer.
+if ! command -v node >/dev/null || [ "$(node -e 'console.log(process.versions.node.split(".")[0])')" -lt 20 ]; then
+  apt-get remove -y -q nodejs npm >/dev/null 2>&1 || true
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
+  apt-get install -y -q nodejs
+fi
 if ! command -v caddy >/dev/null; then
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
