@@ -30,9 +30,17 @@ die() { printf 'provision: %s\n' "$*" >&2; exit 1; }
 LIVS_REPO=${LIVS_REPO:-$(git -C "$(dirname "$0")/.." remote get-url origin 2>/dev/null || echo https://github.com/ggarber1/Live-Website.git)}
 
 find_media_device() {
-  # The first disk with no filesystem and no mount: on EC2 the attached EBS
-  # volume; nothing on a Pi whose drive is already in use.
-  lsblk -dnpo NAME,TYPE,FSTYPE,MOUNTPOINT | awk '$2=="disk" && $3=="" && $4=="" {print $1; exit}'
+  # The first whole disk with no partitions, no filesystem and no mount
+  # anywhere on it: on EC2 the attached EBS volume; nothing on a Pi whose
+  # drive is already in use. The root disk shows a blank filesystem at the
+  # disk level while its partitions carry one, so children are checked too.
+  for disk in $(lsblk -dnpo NAME,TYPE | awk '$2=="disk" {print $1}'); do
+    if [ "$(lsblk -no NAME "$disk" | wc -l)" = 1 ] && [ -z "$(lsblk -no FSTYPE,MOUNTPOINT "$disk" | tr -d '[:space:]')" ]; then
+      echo "$disk"
+      return 0
+    fi
+  done
+  return 1
 }
 
 if [ "${LIVS_DRY_RUN:-0}" = 1 ]; then
@@ -64,7 +72,8 @@ log "media volume at $MEDIA"
 mkdir -p $MEDIA
 DEV=${LIVS_MEDIA_DEV:-$(find_media_device || true)}
 if [ -n "${DEV:-}" ] && ! mountpoint -q $MEDIA; then
-  if [ -z "$(lsblk -no FSTYPE "$DEV")" ]; then
+  [ "$(lsblk -no NAME "$DEV" | wc -l)" = 1 ] || die "$DEV has partitions; refusing to touch it"
+  if [ -z "$(lsblk -no FSTYPE "$DEV" | tr -d '[:space:]')" ]; then
     log "formatting $DEV (it has no filesystem)"
     mkfs.ext4 -q -L media "$DEV"
   fi
