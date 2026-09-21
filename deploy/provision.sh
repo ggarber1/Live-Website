@@ -96,8 +96,11 @@ chmod 750 $MEDIA/backups
 
 log "checkout at $LIVS_HOME"
 if [ ! -d $LIVS_HOME/.git ]; then
-  sudo -u $LIVS_USER git clone -q "$LIVS_REPO" $LIVS_HOME.tmp && mv $LIVS_HOME.tmp/.git $LIVS_HOME/ && rm -rf $LIVS_HOME.tmp
-  sudo -u $LIVS_USER git -C $LIVS_HOME checkout -q -- .
+  # The home directory already exists (useradd made it), so clone in place.
+  sudo -u $LIVS_USER git -C $LIVS_HOME init -q -b main
+  sudo -u $LIVS_USER git -C $LIVS_HOME remote add origin "$LIVS_REPO"
+  sudo -u $LIVS_USER git -C $LIVS_HOME fetch -q origin main
+  sudo -u $LIVS_USER git -C $LIVS_HOME checkout -q -t origin/main
 fi
 sudo -u $LIVS_USER git -C $LIVS_HOME pull -q --ff-only || true
 
