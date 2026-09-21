@@ -32,7 +32,6 @@ export default function LoginPage() {
     <main className="login">
       <form className="card login-card" onSubmit={submit}>
         <p className="site-name">Liv's <span className="ornament" aria-hidden="true">❦</span></p>
-        <h1>It's you, isn't it?</h1>
         {problem && <p role="alert">{problem}</p>}
         <label>
           <span className="label">Password</span>
