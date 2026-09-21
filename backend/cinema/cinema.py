@@ -26,6 +26,14 @@ def unavailable(err):
     return {'error': f'Jellyfin is not reachable: {err}'}, 503
 
 
+@bp.errorhandler(RuntimeError)
+def not_configured(err):
+    """Missing JELLYFIN_* variables: the cinema is off, the site is not."""
+    if 'JELLYFIN' not in str(err):
+        raise err
+    return {'error': f'the cinema is not set up yet: {err}'}, 503
+
+
 @bp.errorhandler(JellyfinNotFound)
 def not_found(err):
     return {'error': 'no such film'}, 404

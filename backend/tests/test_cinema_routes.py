@@ -304,6 +304,15 @@ class TestFailures:
         assert res.status_code == 502
         assert '500' in res.get_json()['error']
 
+    def test_an_unconfigured_cinema_is_a_503_not_a_500(self, client, monkeypatch):
+        for name in ('JELLYFIN_URL', 'JELLYFIN_API_KEY', 'JELLYFIN_USER_ID'):
+            monkeypatch.delenv(name, raising=False)
+
+        res = client.get('/api/cinema/films')
+
+        assert res.status_code == 503
+        assert 'JELLYFIN' in res.get_json()['error']
+
     def test_the_rest_of_the_site_does_not_need_jellyfin(self, client, monkeypatch, reads):
         """Cinema config is read at use time; /api/todo works with none of it set."""
         for name in ('JELLYFIN_URL', 'JELLYFIN_API_KEY', 'JELLYFIN_USER_ID'):
