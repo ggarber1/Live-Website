@@ -1,0 +1,8 @@
+[Unit]
+Description=Dump Liv's database next to the media so the volume snapshot has both
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/opt/livs/backend/.env
+ExecStart=/opt/livs/deploy/backup.sh

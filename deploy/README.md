@@ -4,6 +4,30 @@ Assumes Raspberry Pi OS. Replace `pi` and `/home/pi/livs_website` throughout if
 your user or checkout path differ — the same two values are marked `EDIT` in
 `livs-api.service`.
 
+## On a fresh Ubuntu host (AWS, or a Pi with Ubuntu)
+
+Everything below this section is the hand-run version. `deploy/provision.sh`
+does the same steps idempotently, plus Caddy for TLS and the login:
+
+```bash
+git clone https://github.com/ggarber1/Live-Website.git livs && cd livs
+sudo LIVS_DOMAIN=livs.example.com ./deploy/provision.sh
+```
+
+It formats and mounts the first blank disk at `/mnt/media` (an attached EBS
+volume; nothing on a Pi whose drive is already mounted), installs
+everything, writes `backend/.env` with generated secrets, asks for the
+household password, creates the database, binds Jellyfin to loopback,
+installs the units, and points Caddy at the domain. Re-run it after a `git
+pull` to rebuild and restart. Then: rsync media in, `scan-music`,
+`scan-photos`, and set up Jellyfin through an ssh tunnel with
+`scripts/jellyfin-dev.sh /mnt/media/films`.
+
+The app runs as the system user `livs` from `/opt/livs`; gunicorn listens
+on `127.0.0.1:5000` and only Caddy talks to it. A nightly `mysqldump` lands
+in `/mnt/media/backups` so a snapshot of the media volume carries the
+database too.
+
 ## 1. System packages
 
 `mariadb` (the Python driver) builds against the MariaDB client library, so the

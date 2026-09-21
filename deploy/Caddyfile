@@ -1,0 +1,16 @@
+# Caddy terminates TLS for the site and hands everything to gunicorn.
+# The domain is substituted by provision.sh. Certificates are automatic.
+{$LIVS_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:5000 {
+        # Films and uploads can take a while; do not cut them off.
+        transport http {
+            read_timeout 10m
+            write_timeout 10m
+        }
+    }
+    # Uploads: 25 MB per photo, several per request.
+    request_body {
+        max_size 200MB
+    }
+}
