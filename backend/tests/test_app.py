@@ -3,6 +3,7 @@ import pytest
 
 import todo.todo
 from app import DEFAULT_CORS_ORIGINS, app as flask_app, cors_origins
+from conftest import logged_in
 
 
 class TestCorsOrigins:
@@ -57,7 +58,7 @@ def crashing_client(monkeypatch):
     """A client that renders error handlers instead of re-raising."""
     original = flask_app.config.get('PROPAGATE_EXCEPTIONS')
     flask_app.config.update(TESTING=True, PROPAGATE_EXCEPTIONS=False)
-    yield flask_app.test_client()
+    yield logged_in(flask_app.test_client())
     flask_app.config['PROPAGATE_EXCEPTIONS'] = original
 
 

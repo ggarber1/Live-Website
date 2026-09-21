@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import flask
@@ -9,6 +10,8 @@ from werkzeug.exceptions import HTTPException
 # Before anything reads DB_* or CORS_ORIGINS out of the environment.
 load_dotenv()
 
+from auth import guard
+from auth.auth import bp as auth_bp, hash_password_command
 from blog.blog import bp as blog_bp
 from cinema.audit import cinema_audit_command
 from cinema.cinema import bp as cinema_bp
@@ -45,13 +48,27 @@ def cors_origins():
 API_PREFIX = '/api'
 
 app = flask.Flask(__name__)
-CORS(app, origins=cors_origins())
+CORS(app, origins=cors_origins(), supports_credentials=True)
+
+# The session cookie. SECRET_KEY must be set in production or every restart
+# logs everyone out; a random one here keeps development and tests working.
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY') or os.urandom(32),
+    SESSION_COOKIE_NAME='livs_session',
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.environ.get('SITE_HTTPS') == '1',
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30),
+    SESSION_REFRESH_EACH_REQUEST=True,
+)
 
 db.init_app(app)
+app.cli.add_command(hash_password_command)
 app.cli.add_command(scan_music_command)
 app.cli.add_command(scan_photos_command)
 app.cli.add_command(cinema_audit_command)
 
+app.register_blueprint(auth_bp, url_prefix=API_PREFIX)
 app.register_blueprint(blog_bp, url_prefix=API_PREFIX)
 app.register_blueprint(cinema_bp, url_prefix=API_PREFIX)
 app.register_blueprint(habits_bp, url_prefix=API_PREFIX)
@@ -59,6 +76,7 @@ app.register_blueprint(music_bp, url_prefix=API_PREFIX)
 app.register_blueprint(photos_bp, url_prefix=API_PREFIX)
 app.register_blueprint(recipes_bp, url_prefix=API_PREFIX)
 app.register_blueprint(todo_bp, url_prefix=API_PREFIX)
+guard.install(app, API_PREFIX)
 
 
 @app.errorhandler(HTTPException)

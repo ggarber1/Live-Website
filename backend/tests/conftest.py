@@ -96,7 +96,24 @@ def reads(monkeypatch):
     return fake
 
 
+def logged_in(client):
+    """Put the household session on a test client, without the password dance.
+
+    Every route test wants to test its route, not the login. test_auth.py is
+    the one place the raw client is used, to prove the guard is load-bearing.
+    """
+    with client.session_transaction() as sess:
+        sess['livs'] = True
+    return client
+
+
 @pytest.fixture
 def client():
+    flask_app.config.update(TESTING=True)
+    return logged_in(flask_app.test_client())
+
+
+@pytest.fixture
+def anonymous_client():
     flask_app.config.update(TESTING=True)
     return flask_app.test_client()

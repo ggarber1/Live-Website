@@ -11,6 +11,7 @@ import requests
 from dotenv import load_dotenv
 
 from app import app as flask_app
+from conftest import logged_in
 
 pytestmark = pytest.mark.jellyfin
 
@@ -30,7 +31,7 @@ def live(monkeypatch):
     except requests.RequestException as err:
         pytest.skip(f'no Jellyfin at {url}: {err}')
     flask_app.config.update(TESTING=True)
-    return flask_app.test_client()
+    return logged_in(flask_app.test_client())
 
 
 @pytest.fixture

@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from app import app as flask_app
 from database import db
 from music import scanner
+from conftest import logged_in
 
 pytestmark = pytest.mark.integration
 
@@ -65,7 +66,7 @@ def library(real_env, live_db):
 @pytest.fixture
 def client(live_db):
     flask_app.config.update(TESTING=True)
-    return flask_app.test_client()
+    return logged_in(flask_app.test_client())
 
 
 def write_audio(root, relative, payload=b'ID3' + b'x' * 2048):

@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from app import app as flask_app
 from database import db
+from conftest import logged_in
 
 pytestmark = pytest.mark.integration
 
@@ -41,7 +42,7 @@ def live_db(real_env):
 @pytest.fixture
 def client(live_db):
     flask_app.config.update(TESTING=True)
-    return flask_app.test_client()
+    return logged_in(flask_app.test_client())
 
 
 @pytest.fixture
