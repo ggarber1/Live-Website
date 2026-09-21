@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 import mutagen
 import mutagen.id3
@@ -100,10 +101,10 @@ def read_tags(path):
 
     # Untagged downloads are usually named "Artist - Title". With no tags at
     # all, that is better than a title with a dash in it and no artist.
-    if title is None and artist is None and ' - ' in fallback:
-        left, right = fallback.split(' - ', 1)
-        if left.strip() and right.strip():
-            artist, fallback = left.strip(), right.strip()
+    if title is None and artist is None:
+        parts = re.split(r'\s+-+\s+', fallback, maxsplit=1)
+        if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+            artist, fallback = parts[0].strip(), parts[1].strip()
 
     return {
         'title': title or fallback,

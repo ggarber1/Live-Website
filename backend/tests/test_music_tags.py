@@ -254,6 +254,20 @@ class TestFilenameFallback:
 
         assert (tags['artist'], tags['title']) == ('Taylor Swift', 'I Knew It - live')
 
+    def test_a_double_dash_separates_too(self, tmp_path):
+        path = tmp_path / 'Donna Summer -- Hot Stuff.mp3'
+        path.write_bytes(b'x')
+
+        tags = read_tags(str(path))
+
+        assert (tags['artist'], tags['title']) == ('Donna Summer', 'Hot Stuff')
+
+    def test_a_hyphenated_word_is_not_a_separator(self, tmp_path):
+        path = tmp_path / 'Self-Titled Song.mp3'
+        path.write_bytes(b'x')
+
+        assert read_tags(str(path))['artist'] is None
+
     def test_a_name_without_the_pattern_stays_the_title(self, tmp_path):
         path = tmp_path / 'Some Song.mp3'
         path.write_bytes(b'x')
