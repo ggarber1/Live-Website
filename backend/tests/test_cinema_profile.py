@@ -1,6 +1,6 @@
 import pytest
 
-from cinema.profile import DEVICE_PROFILE, H264_MAX_LEVEL, H264_PROFILES, playback_kind
+from cinema.profile import DEVICE_PROFILE, H264_MAX_LEVEL, H264_PROFILES, MAX_AUDIO_CHANNELS, playback_kind
 
 
 def source(container, vcodec, acodec, profile=None):
@@ -52,6 +52,13 @@ class TestProfileGuards:
 
     def test_allows_level_51(self):
         assert self.h264_conditions()['VideoLevel'] == H264_MAX_LEVEL == '51'
+
+    def test_surround_aac_direct_plays(self):
+        """A 5.1 AAC mp4 was being remuxed just to downmix; browsers do that."""
+        [aac] = [c for c in DEVICE_PROFILE['CodecProfiles'] if c['Type'] == 'VideoAudio']
+        channels = next(c['Value'] for c in aac['Conditions'] if c['Property'] == 'AudioChannels')
+        assert int(channels) >= 6
+        assert MAX_AUDIO_CHANNELS == 6
 
     def test_transcodes_to_hls_h264_aac(self):
         [hls] = DEVICE_PROFILE['TranscodingProfiles']

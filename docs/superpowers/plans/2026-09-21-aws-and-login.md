@@ -8,7 +8,7 @@
 
 **Tech Stack:** as before, plus Caddy. `werkzeug.security` for the password hash (already a dependency via Flask). AWS CLI with `--profile personal` for every call; the default profile is a dead work credential and is never used.
 
-**STATUS, 2026-09-21: Tasks 1-4 done; the site is live at https://livs.greggarber.net behind the login, empty, with a temporary random household password (in `~/.ssh/livs-temp-password.txt` on Greg's Mac) to be replaced with Greg's choice. Jellyfin is set up and bound to loopback (`~/.ssh/livs-jellyfin-password.txt` holds its admin password). Task 5 (media) and Task 6 (a phone on cellular) remain.** Resource ids: `deploy/aws.md`. Four script fixes came out of the first real run and are committed: the UUID race after mkfs, the root-disk trap in the device finder, Node 22, and not sourcing `.env`. One tooling lesson: `ssh` inside a heredoc script eats the rest of the script as stdin; use `ssh -n`.
+**STATUS, 2026-09-21: Tasks 1-4 done; the site is live at https://livs.greggarber.net behind the login, empty, with a temporary random household password (in `~/.ssh/livs-temp-password.txt` on Greg's Mac) to be replaced with Greg's choice. Jellyfin is set up and bound to loopback (`~/.ssh/livs-jellyfin-password.txt` holds its admin password). Task 5 is done (7 photos, 38 songs, 3 films, all verified through the site); Task 6, a phone on cellular, is Greg's. The household password is set. Uploads from the Mac ran at 0.2 to 1 MB/s and were resumed twice across network drops; ssh is allowed from the home /24.** Resource ids: `deploy/aws.md`. Four script fixes came out of the first real run and are committed: the UUID race after mkfs, the root-disk trap in the device finder, Node 22, and not sourcing `.env`. One tooling lesson: `ssh` inside a heredoc script eats the rest of the script as stdin; use `ssh -n`.
 
 Spec context: `docs/superpowers/specs/2026-09-09-media-library-design.md` Phase 3 (the auth boundary and "Jellyfin behind the proxy" parts apply; Route 53 dynamic DNS and the CGNAT question do not, since an Elastic IP is static).
 
@@ -80,9 +80,9 @@ All with `aws --profile personal --region us-west-2`. Each resource tagged `Proj
 
 ### Task 5: Media and Jellyfin
 
-- [ ] rsync music, photos and films from the Mac to `/mnt/media/...`. `scan-music`, `scan-photos`.
-- [ ] Jellyfin through an ssh tunnel: `scripts/jellyfin-dev.sh /mnt/media/films`, paste the three values into `.env`, restart `livs-api`.
-- [ ] `cinema-audit`.
+- [x] rsync music, photos and films from the Mac to `/mnt/media/...`. `scan-music`, `scan-photos`.
+- [x] Jellyfin through an ssh tunnel: `scripts/jellyfin-dev.sh /mnt/media/films`, paste the three values into `.env`, restart `livs-api`.
+- [x] `cinema-audit`.
 
 ### Task 6: Verify from outside the house
 

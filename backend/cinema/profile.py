@@ -8,6 +8,7 @@ that plays and one that stutters. Measured on 12.1.0; see the spec.
 
 H264_PROFILES = 'high|main|baseline|constrained baseline'
 H264_MAX_LEVEL = '51'
+MAX_AUDIO_CHANNELS = 6
 
 DEVICE_PROFILE = {
     'Name': 'livs-browser',
@@ -28,8 +29,10 @@ DEVICE_PROFILE = {
             {'Condition': 'NotEquals', 'Property': 'IsAnamorphic', 'Value': 'true', 'IsRequired': False},
             {'Condition': 'EqualsAny', 'Property': 'VideoRangeType', 'Value': 'SDR', 'IsRequired': False},
         ]},
+        # Browsers decode 5.1 AAC and downmix it themselves. Capping this at
+        # stereo made Jellyfin remux every surround film for no gain.
         {'Type': 'VideoAudio', 'Codec': 'aac', 'Conditions': [
-            {'Condition': 'LessThanEqual', 'Property': 'AudioChannels', 'Value': '2', 'IsRequired': False},
+            {'Condition': 'LessThanEqual', 'Property': 'AudioChannels', 'Value': str(MAX_AUDIO_CHANNELS), 'IsRequired': False},
         ]},
     ],
     'SubtitleProfiles': [
