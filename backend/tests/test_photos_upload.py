@@ -24,6 +24,14 @@ def jpeg_bytes(size=(60, 40), taken=None):
     return buf.getvalue()
 
 
+def iphone_jpeg_bytes():
+    """A JPEG with a second image appended, as iPhones save them (Pillow: MPO)."""
+    buf = io.BytesIO()
+    main, gain_map = Image.new('RGB', (60, 40), 'purple'), Image.new('RGB', (30, 20), 'gray')
+    main.save(buf, 'MPO', save_all=True, append_images=[gain_map])
+    return buf.getvalue()
+
+
 def png_bytes():
     buf = io.BytesIO()
     Image.new('RGBA', (10, 10), (255, 0, 0, 128)).save(buf, 'PNG')
@@ -68,6 +76,15 @@ class TestUpload:
 
         assert res.status_code == 201
         assert stored_files(library)[0].endswith('.png')
+
+    def test_an_iphone_jpeg_is_stored_as_a_jpeg(self, client, writes, library):
+        res = post(client, ('IMG_0001.jpg', iphone_jpeg_bytes()))
+
+        assert res.status_code == 201, res.get_json()
+        [added] = res.get_json()['added']
+        assert added['format'] == 'jpeg'
+        [stored] = stored_files(library)
+        assert stored.endswith('.jpg')
 
     def test_a_bad_file_is_rejected_by_name_while_the_good_one_is_kept(self, client, writes, library):
         res = post(client, ('notes.jpg', b'hello'), ('real.jpg', jpeg_bytes()))

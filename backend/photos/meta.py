@@ -9,6 +9,9 @@ IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.gif')
 
 EXIF_IFD = 0x8769
 DATE_TIME_ORIGINAL = 36867
+# Pillow names a JPEG with extra images appended (an iPhone's HDR gain map)
+# MPO. The first image is an ordinary JPEG and every browser shows it as one.
+FORMAT_ALIASES = {'mpo': 'jpeg'}
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,7 @@ def read_image(path):
     try:
         with Image.open(path) as img:
             img_format = (img.format or '').lower()
+            img_format = FORMAT_ALIASES.get(img_format, img_format)
             exif = img.getexif()
             upright = ImageOps.exif_transpose(img)
             width, height = upright.size
