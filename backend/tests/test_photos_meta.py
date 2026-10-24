@@ -60,6 +60,16 @@ def test_png_and_webp_are_read(tmp_path):
     assert read_image(tmp_path / 'a.webp')['format'] == 'webp'
 
 
+def test_an_iphone_multi_picture_jpeg_is_read_as_jpeg(tmp_path):
+    """iPhones save a JPEG with its HDR gain map appended; Pillow calls that MPO."""
+    main, gain_map = Image.new('RGB', (40, 30), 'purple'), Image.new('RGB', (20, 15), 'gray')
+    main.save(tmp_path / 'a.jpg', 'MPO', save_all=True, append_images=[gain_map])
+
+    meta = read_image(tmp_path / 'a.jpg')
+
+    assert (meta['width'], meta['height'], meta['format']) == (40, 30, 'jpeg')
+
+
 def test_a_corrupt_file_is_none_not_an_exception(tmp_path):
     (tmp_path / 'a.jpg').write_bytes(b'\xff\xd8\xff' + b'junk' * 10)
 
