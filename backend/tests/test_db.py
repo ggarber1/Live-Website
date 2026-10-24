@@ -140,6 +140,14 @@ def test_connection_uses_the_configured_credentials(connections):
     assert connections[0].config['database'] == 'test_db'
 
 
+def test_every_session_reads_timestamps_in_utc(connections):
+    """The server's clock zone must not leak into created_at values."""
+    with flask_app.app_context():
+        db.get_connection()
+
+    assert connections[0].config['init_command'] == "SET time_zone = '+00:00'"
+
+
 @pytest.fixture
 def conn(connections):
     """A single request-scoped connection, with an app context pushed."""

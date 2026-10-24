@@ -4,6 +4,7 @@ from flask import Blueprint, abort, jsonify
 
 from api import json_body
 from database.db import execute, fetch_all, fetch_one, insert
+from site_time import site_today
 
 bp = Blueprint('habits', __name__)
 
@@ -55,7 +56,7 @@ def complete_habit(habit_id):
     if habit is None:
         abort(404, description=f"no habit with id {habit_id}")
 
-    today = datetime.date.today()
+    today = site_today()
     streak = next_streak(habit['last_completed'], habit['streak'], today)
     execute(
         "UPDATE habits SET streak = ?, last_completed = ? WHERE id = ?",

@@ -22,6 +22,7 @@ from music.scanner import scan_music_command
 from photos.photos import bp as photos_bp
 from photos.scanner import scan_photos_command
 from recipes.recipes import bp as recipes_bp
+from site_time import site_timezone
 from todo.todo import bp as todo_bp
 
 # The built frontend. Served from the same origin so the Pi runs one process;
@@ -46,6 +47,9 @@ def cors_origins():
 # Every blueprint lives under /api so the frontend's routes (/todo, /recipes/3)
 # can never collide with the API's (/api/todo, /api/recipes/3).
 API_PREFIX = '/api'
+
+# Fail at startup, not on the first habit ticked, if LIVS_TIMEZONE is wrong.
+site_timezone()
 
 app = flask.Flask(__name__)
 CORS(app, origins=cors_origins(), supports_credentials=True)

@@ -6,6 +6,10 @@ from flask import g
 from flask.cli import with_appcontext
 
 REQUIRED_ENV = ('DB_USER', 'DB_PASSWORD', 'DB_NAME')
+# TIMESTAMP columns come back in the session's zone. Pinning it to UTC makes
+# them true UTC whatever the server's clock says, which is what jsonify's
+# "GMT" label claims and what the browser converts to local time.
+UTC_SESSION = "SET time_zone = '+00:00'"
 
 
 def db_config():
@@ -44,7 +48,7 @@ def get_connection():
     requests interleave on one cursor and read each other's rowcount/lastrowid.
     """
     if 'db_conn' not in g:
-        g.db_conn = mariadb.connect(**db_config())
+        g.db_conn = mariadb.connect(**db_config(), init_command=UTC_SESSION)
     return g.db_conn
 
 

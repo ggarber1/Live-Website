@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
-import { formatDate } from '../format'
+import { formatLocalDate } from '../format'
 import { getPost, removePost, type Post } from './api'
 import { paragraphs } from './text'
 
@@ -32,7 +32,7 @@ export default function PostPage() {
     <>
       <p className="crumb"><Link to="/blog">Blog</Link></p>
       <h1>{post.title}</h1>
-      <p className="subtitle">{formatDate(post.created_at)}</p>
+      <p className="subtitle">{formatLocalDate(post.created_at)}</p>
       <article className="entry">
         {paragraphs(post.content).map((text, i) => <p key={i}>{text}</p>)}
       </article>
