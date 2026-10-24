@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router'
 
-import { formatDate } from '../format'
+import { formatLocalDate } from '../format'
 import { createPost, getPost, listPosts, updatePost, type Post, type PostDraft } from './api'
 import PostForm from './PostForm'
 import PostPage from './PostPage'
@@ -42,7 +42,7 @@ function EntryList() {
           {posts.map((post) => (
             <Link key={post.id} to={`/blog/${post.id}`} className="card card-link">
               <h2>{post.title}</h2>
-              <p className="date">{formatDate(post.created_at)}</p>
+              <p className="date">{formatLocalDate(post.created_at)}</p>
               <p className="excerpt">{excerpt(post.content)}</p>
             </Link>
           ))}

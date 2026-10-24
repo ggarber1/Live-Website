@@ -15,11 +15,21 @@ export function describe(track: Track): string {
   return [track.artist, track.album].filter(Boolean).join(' — ')
 }
 
-// created_at arrives as an RFC 1123 string from Flask's jsonify. Rendered in
-// UTC so the date does not shift with the viewer's timezone.
+// Dates arrive as RFC 1123 strings from Flask's jsonify, always labelled GMT.
+
+// For wall-clock times with no zone, like a photo's EXIF taken_at: rendered in
+// UTC, which is how they were labelled, so the day never shifts.
 export function formatDate(rfc1123: string): string {
   return new Date(rfc1123).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
+}
+
+// For real moments, like when a post was written: the API sends true UTC, so
+// this shows the day it was where the viewer is.
+export function formatLocalDate(rfc1123: string, timeZone?: string): string {
+  return new Date(rfc1123).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone,
   })
 }
 

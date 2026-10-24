@@ -2,6 +2,7 @@ import datetime
 
 import pytest
 
+import habits.habits
 from habits.habits import next_streak
 
 TODAY = datetime.date(2026, 9, 5)
@@ -31,6 +32,12 @@ class TestNextStreak:
         assert next_streak(datetime.date(2028, 2, 29), 2, datetime.date(2028, 3, 1)) == 3
 
 
+@pytest.fixture(autouse=True)
+def site_today(monkeypatch):
+    """Pin the site's date so these tests don't depend on when they run."""
+    monkeypatch.setattr(habits.habits, 'site_today', lambda: TODAY)
+
+
 @pytest.fixture
 def habit(reads):
     """An existing habit, completed yesterday with a streak of 4."""
@@ -38,7 +45,7 @@ def habit(reads):
         'id': 3,
         'name': 'floss',
         'streak': 4,
-        'last_completed': datetime.date.today() - datetime.timedelta(days=1),
+        'last_completed': YESTERDAY,
         'created_at': datetime.datetime(2026, 9, 1, 8, 0),
     }
     return reads.row
@@ -59,7 +66,7 @@ def test_complete_writes_the_new_streak_and_today(client, habit, writes):
 
     query, params = writes.queries[0]
     assert query == "UPDATE habits SET streak = ?, last_completed = ? WHERE id = ?"
-    assert params == (5, datetime.date.today(), 3)
+    assert params == (5, TODAY, 3)
 
 
 def test_complete_is_idempotent_within_a_day(client, reads, writes):
@@ -67,7 +74,7 @@ def test_complete_is_idempotent_within_a_day(client, reads, writes):
         'id': 3,
         'name': 'floss',
         'streak': 4,
-        'last_completed': datetime.date.today(),
+        'last_completed': TODAY,
         'created_at': datetime.datetime(2026, 9, 1, 8, 0),
     }
 
@@ -75,7 +82,7 @@ def test_complete_is_idempotent_within_a_day(client, reads, writes):
 
     assert res.get_json()['streak'] == 4
     _, params = writes.queries[0]
-    assert params == (4, datetime.date.today(), 3)
+    assert params == (4, TODAY, 3)
 
 
 def test_complete_404s_for_an_unknown_habit(client, reads, writes):
