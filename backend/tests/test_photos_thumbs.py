@@ -3,6 +3,7 @@ import os
 import pytest
 from PIL import Image
 
+from photos import thumbs as thumbs_module
 from photos.thumbs import SIZES, forget, thumb_path, thumbnail
 
 
@@ -88,3 +89,27 @@ def test_no_partial_file_is_left_behind(library):
     thumbnail(7, source(library), 400)
 
     assert [n for n in os.listdir(library / '.thumbnails') if n.endswith('.part')] == []
+
+
+def test_a_large_jpeg_is_decoded_at_reduced_scale(library, monkeypatch):
+    decoded = []
+    real_transpose = thumbs_module.ImageOps.exif_transpose
+
+    def spy(img):
+        decoded.append(img.size)
+        return real_transpose(img)
+
+    monkeypatch.setattr(thumbs_module.ImageOps, 'exif_transpose', spy)
+    out = thumbnail(7, source(library, size=(4000, 3000)), 400)
+
+    # 1/8 would be 500x375, short side under 400, so 1/4 is the smallest safe scale.
+    assert decoded == [(1000, 750)], 'a 4000x3000 JPEG should decode at 1/4 scale for a 400 thumb'
+    with Image.open(out) as img:
+        assert (img.width, img.height) == (400, 300)
+
+
+def test_reduced_decoding_still_fills_a_rotated_large_thumb(library):
+    out = thumbnail(7, source(library, size=(4000, 3000), orientation=6), 1200)
+
+    with Image.open(out) as img:
+        assert (img.width, img.height) == (1200, 1600)
