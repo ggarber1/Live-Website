@@ -33,6 +33,11 @@ def thumbnail(photo_id, source_path, width):
         return target
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with Image.open(source_path) as img:
+        # A JPEG then decodes at 1/2, 1/4 or 1/8 scale instead of full size:
+        # a 12 MP phone photo is ~48 MB decoded, enough to bloat a worker.
+        # Asking for width x width keeps the short side >= width before
+        # rotation, so the result is never smaller than thumbnail() needs.
+        img.draft(None, (width, width))
         upright = ImageOps.exif_transpose(img)
         upright.thumbnail((width, width * 2))
         if upright.mode in ('RGBA', 'LA', 'P'):

@@ -18,10 +18,20 @@ EnvironmentFile=/home/pi/livs_website/backend/.env
 # sync workers three listeners would block every other request, including
 # /todo. Threads let one process hold several stalled transfers at once.
 # Phase 3 moves the bytes out of Python entirely via X-Accel-Redirect.
+#
+# Memory: glibc gives each thread its own malloc arena and rarely hands freed
+# pages back, so threaded workers ratchet up after every spike (one reached
+# 647 MB and was OOM-killed on a 2 GB box). Two arenas per process stops the
+# ratchet; --max-requests recycles a worker as a backstop, and is high enough
+# that cutting an in-flight stream is rare. Two workers x 8 threads is still
+# 16 concurrent requests — far beyond one household.
+Environment=MALLOC_ARENA_MAX=2
 ExecStart=/home/pi/livs_website/backend/venv/bin/gunicorn \
-    --workers 3 \
+    --workers 2 \
     --worker-class gthread \
     --threads 8 \
+    --max-requests 5000 \
+    --max-requests-jitter 500 \
     --bind 0.0.0.0:5000 \
     --access-logfile - \
     --error-logfile - \
